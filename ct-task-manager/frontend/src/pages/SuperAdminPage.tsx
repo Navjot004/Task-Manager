@@ -1,0 +1,321 @@
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { 
+  Users, 
+  UserCheck, 
+  Briefcase, 
+  Building, 
+  Shield, 
+  Users as UsersIcon, 
+  ClipboardCheck,
+  ClipboardList,
+  Clock,
+  CheckCircle,
+  AlertTriangle,
+  Filter,
+  MoreVertical,
+  ChevronDown,
+  ArrowUp
+} from 'lucide-react';
+import { api } from '../services/api';
+import { calculateUrgency, getUrgencyCardStyle, getUrgencyLabel, getUrgencyColor } from '../utils/taskUrgency';
+import './SuperAdminDashboard.css';
+
+const SuperAdminPage = () => {
+  const navigate = useNavigate();
+
+  const [userStats, setUserStats] = useState({
+    totalUsers: 0,
+    activeUsers: 0,
+    inactiveUsers: 0,
+    superAdmins: 0,
+    departmentAdmins: 0,
+    staff: 0
+  });
+
+  const [taskMetrics, setTaskMetrics] = useState({
+    total: 0,
+    pending: 0,
+    completed: 0,
+    overdue: 0 // Cannot fetch overdue easily without endpoint
+  });
+
+  const [recentTasks, setRecentTasks] = useState<any[]>([]);
+  const [tasksAwaitingReview, setTasksAwaitingReview] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      try {
+        setLoading(true);
+        // Fetch User Stats
+        const userStatsRes = await api.getUserStats();
+        if (userStatsRes.success) {
+          setUserStats(userStatsRes.data);
+        }
+
+        // Fetch Task Metrics (Counts)
+        const [totalRes, pendingRes, completedRes] = await Promise.all([
+          api.getTasks({ limit: 1 }),
+          api.getTasks({ limit: 1, status: 'pending' }),
+          api.getTasks({ limit: 1, status: 'completed' })
+        ]);
+
+        setTaskMetrics({
+          total: totalRes.data.pagination.total,
+          pending: pendingRes.data.pagination.total,
+          completed: completedRes.data.pagination.total,
+          overdue: 0 // Placeholder
+        });
+
+        // Fetch Tasks Awaiting Review
+        const reviewRes = await api.getTasks({ limit: 5, status: 'submitted_for_review', reviewStage: 'super_admin' });
+        setTasksAwaitingReview(reviewRes.data.tasks);
+
+        // Fetch Recent Activity (Latest tasks)
+        const recentRes = await api.getTasks({ limit: 5 });
+        setRecentTasks(recentRes.data.tasks);
+
+      } catch (error) {
+        console.error("Error fetching dashboard data:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDashboardData();
+  }, []);
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'completed':
+      case 'approved': return 'green';
+      case 'rejected': return 'red';
+      case 'in_progress':
+      case 'submitted_for_review': return 'yellow';
+      default: return 'gray';
+    }
+  };
+
+  const getStatusBadgeClass = (status: string) => {
+    switch (status) {
+      case 'completed':
+      case 'approved': return 'approved';
+      case 'rejected': return 'rejected';
+      case 'in_progress':
+      case 'submitted_for_review': return 'inprogress';
+      default: return 'pending';
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
+  return (
+    <div className="sa-dashboard-container">
+      
+      {/* TOP ROW METRICS */}
+      <div className="sa-metrics-row">
+        <div className="sa-metric-card">
+          <div className="sa-metric-header">
+            <span className="sa-metric-title">Total Users</span>
+            <Users className="sa-metric-icon" size={18} />
+          </div>
+          <div className="sa-metric-value">{loading ? '...' : userStats.totalUsers}</div>
+          <div className="sa-metric-trend sa-trend-up">
+            <ArrowUp size={14} /> All registered users
+          </div>
+        </div>
+        
+        <div className="sa-metric-card">
+          <div className="sa-metric-header">
+            <span className="sa-metric-title">Active Users</span>
+            <UserCheck className="sa-metric-icon" size={18} />
+          </div>
+          <div className="sa-metric-value">{loading ? '...' : userStats.activeUsers}</div>
+          <div className="sa-metric-progress-bar">
+            <div className="sa-metric-progress-fill" style={{ width: `${userStats.totalUsers > 0 ? (userStats.activeUsers / userStats.totalUsers) * 100 : 0}%` }}></div>
+          </div>
+        </div>
+
+        <div className="sa-metric-card">
+          <div className="sa-metric-header">
+            <span className="sa-metric-title">Staff</span>
+            <Briefcase className="sa-metric-icon" size={18} />
+          </div>
+          <div className="sa-metric-value">{loading ? '...' : userStats.staff}</div>
+        </div>
+
+        <div className="sa-metric-card">
+          <div className="sa-metric-header">
+            <span className="sa-metric-title">Dept Admins</span>
+            <Building className="sa-metric-icon" size={18} />
+          </div>
+          <div className="sa-metric-value">{loading ? '...' : userStats.departmentAdmins}</div>
+        </div>
+
+        <div className="sa-metric-card">
+          <div className="sa-metric-header">
+            <span className="sa-metric-title">Super Admins</span>
+            <Shield className="sa-metric-icon" size={18} />
+          </div>
+          <div className="sa-metric-value">{loading ? '...' : userStats.superAdmins}</div>
+        </div>
+      </div>
+
+      {/* MIDDLE ROW */}
+      <div className="sa-middle-row" style={{ gridTemplateColumns: '1fr' }}>
+
+        {/* Tasks Awaiting Review */}
+        <div className="sa-review-card">
+          <div className="sa-review-header">
+            <div className="sa-review-title-group">
+              <div className="sa-review-title">
+                <ClipboardCheck className="sa-review-icon" size={20} /> Tasks Awaiting Review
+              </div>
+              <div className="sa-review-desc">High priority tasks requiring admin approval.</div>
+            </div>
+            <div className="sa-review-count">{loading ? '...' : tasksAwaitingReview.length}</div>
+          </div>
+
+          <div className="sa-review-list">
+            {tasksAwaitingReview.length > 0 ? (
+              tasksAwaitingReview.map(task => {
+                const urgency = calculateUrgency(task.deadline);
+                const cardStyle = getUrgencyCardStyle(urgency);
+                const urgencyLabel = getUrgencyLabel(urgency);
+                const urgencyColor = getUrgencyColor(urgency);
+                
+                return (
+                <div key={task._id} className="sa-review-item" style={{ backgroundColor: cardStyle.backgroundColor, borderLeft: cardStyle.borderLeft }}>
+                  <div className="sa-review-info">
+                    <div className="sa-review-item-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      {task.title}
+                      <span className="sa-badge" style={{ background: urgencyColor + '20', color: urgencyColor, border: `1px solid ${urgencyColor}40`, padding: '0.15rem 0.5rem', borderRadius: '4px', fontSize: '0.7rem' }}>
+                        {urgencyLabel}
+                      </span>
+                    </div>
+                    <div className="sa-review-meta">
+                      <span><UsersIcon size={14} /> Assignee: {task.assignedTo?.name || 'Unassigned'}</span>
+                      <span style={{ color: urgencyColor }}><Clock size={14} /> Deadline: {new Date(task.deadline).toLocaleDateString()}</span>
+                    </div>
+                  </div>
+                  <span className="sa-badge-inprogress" style={{ background: '#e0e7ff', color: '#3730a3' }}>Needs Review</span>
+                </div>
+              )})
+            ) : (
+              <div style={{ color: '#64748b', fontSize: '0.9rem' }}>No tasks currently awaiting review.</div>
+            )}
+          </div>
+
+          <a href="#" className="sa-view-all-link" onClick={(e) => { e.preventDefault(); navigate('/super-admin/tasks'); }}>
+            View all pending reviews &rarr;
+          </a>
+        </div>
+      </div>
+
+      {/* BOTTOM ROW */}
+      <div className="sa-bottom-row">
+        
+        {/* Task Metrics */}
+        <div className="sa-task-metrics">
+          <div className="sa-tm-card">
+            <div className="sa-tm-info">
+              <span className="sa-tm-title">Total Tasks</span>
+              <span className="sa-tm-value">{loading ? '...' : taskMetrics.total}</span>
+            </div>
+            <div className="sa-tm-icon"><ClipboardList size={20} /></div>
+          </div>
+
+          <div className="sa-tm-card">
+            <div className="sa-tm-info">
+              <span className="sa-tm-title">Pending</span>
+              <span className="sa-tm-value">{loading ? '...' : taskMetrics.pending}</span>
+            </div>
+            <div className="sa-tm-icon"><Clock size={20} /></div>
+          </div>
+
+          <div className="sa-tm-card success">
+            <div className="sa-tm-info">
+              <span className="sa-tm-title">Completed</span>
+              <span className="sa-tm-value">{loading ? '...' : taskMetrics.completed}</span>
+            </div>
+            <div className="sa-tm-icon"><CheckCircle size={20} /></div>
+          </div>
+
+          <div className="sa-tm-card danger">
+            <div className="sa-tm-info">
+              <span className="sa-tm-title">Overdue</span>
+              <span className="sa-tm-value">{loading ? '...' : taskMetrics.overdue}</span>
+            </div>
+            <div className="sa-tm-icon"><AlertTriangle size={20} /></div>
+          </div>
+        </div>
+
+        {/* Recent Activity */}
+        <div className="sa-activity-card">
+          <div className="sa-activity-header">
+            <h2 className="sa-activity-title">Recent Activity</h2>
+            <div className="sa-activity-actions">
+              <button className="sa-icon-btn" onClick={() => navigate('/super-admin/tasks')}><Filter size={16} /></button>
+            </div>
+          </div>
+
+          <table className="sa-activity-table">
+            <thead>
+              <tr>
+                <th>Task Name</th>
+                <th>Assignee</th>
+                <th>Status</th>
+                <th>Deadline</th>
+              </tr>
+            </thead>
+            <tbody>
+              {recentTasks.length > 0 ? (
+                recentTasks.map(task => {
+                  const urgency = calculateUrgency(task.deadline);
+                  const cardStyle = getUrgencyCardStyle(urgency);
+                  
+                  return (
+                  <tr key={task._id} style={{ backgroundColor: cardStyle.backgroundColor }}>
+                    <td className="sa-task-name-cell" style={{ borderLeft: cardStyle.borderLeft, paddingLeft: '1rem' }}>
+                      <div className={`sa-status-indicator ${getStatusColor(task.status)}`}></div>
+                      <span className="sa-task-name-text">{task.title}</span>
+                    </td>
+                    <td>
+                      <div className="sa-assignee-cell">
+                        <div className="sa-assignee-avatar">
+                          {task.assignedTo?.name ? task.assignedTo.name.charAt(0) : '?'}
+                        </div>
+                        <span className="sa-assignee-id">{task.assignedTo?.name || 'Unassigned'}</span>
+                      </div>
+                    </td>
+                    <td><span className={`sa-status-badge ${getStatusBadgeClass(task.status)}`}>{task.status.replace(/_/g, ' ')}</span></td>
+                    <td className="sa-date-text">{formatDate(task.deadline)}</td>
+                  </tr>
+                  );
+                })
+              ) : (
+                <tr>
+                  <td colSpan={4} style={{ textAlign: 'center', color: '#64748b' }}>No recent tasks found.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+
+          {recentTasks.length > 0 && (
+            <button className="sa-load-more" onClick={() => navigate('/super-admin/tasks')}>
+              View All Tasks <ChevronDown size={16} />
+            </button>
+          )}
+        </div>
+
+      </div>
+    </div>
+  );
+};
+
+export default SuperAdminPage;
+

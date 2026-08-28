@@ -1,0 +1,76 @@
+import { Router } from 'express';
+import {
+  createTask,
+  getTasks,
+  getTaskById,
+  updateTask,
+  assignTask,
+  updateTaskStatus,
+  submitReview,
+  reviewTask,
+  createSubtask,
+  getSubtasks,
+  getTaskProgress
+} from '../controllers/taskController';
+import { authenticate, authorizeRoles } from '../middleware/auth';
+
+const router = Router();
+
+router.use(authenticate);
+
+// @route   POST /api/tasks
+// @desc    Create a task
+// @access  Super Admin, Department Admin
+router.post('/', authorizeRoles('super_admin', 'department_admin'), createTask);
+
+// @route   GET /api/tasks
+// @desc    Get all visible tasks with filtering/pagination
+// @access  All roles
+router.get('/', getTasks);
+
+// @route   GET /api/tasks/:id
+// @desc    Get a single task by ID
+// @access  All roles (visibility enforced in controller)
+router.get('/:id', getTaskById);
+
+// @route   PATCH /api/tasks/:id
+// @desc    Update task details (title, description, deadline)
+// @access  Super Admin, Department Admin (own only)
+router.patch('/:id', authorizeRoles('super_admin', 'department_admin'), updateTask);
+
+// @route   PATCH /api/tasks/:id/assign
+// @desc    Assign or unassign a task
+// @access  Super Admin, Department Admin
+router.patch('/:id/assign', authorizeRoles('super_admin', 'department_admin'), assignTask);
+
+// @route   PATCH /api/tasks/:id/status
+// @desc    Update task status
+// @access  All roles (visibility enforced in controller)
+router.patch('/:id/status', updateTaskStatus);
+
+// @route   PATCH /api/tasks/:id/submit-review
+// @desc    Submit a task for review
+// @access  Assignee only (verified in controller)
+router.patch('/:id/submit-review', submitReview);
+
+// @route   PATCH /api/tasks/:id/review
+// @desc    Approve or reject a task
+// @access  Super Admin or assigned Department Admin
+router.patch('/:id/review', authorizeRoles('super_admin', 'department_admin'), reviewTask);
+
+// @route   POST /api/tasks/:id/subtasks
+// @desc    Create a subtask
+// @access  Super Admin, Department Admin
+router.post('/:id/subtasks', authorizeRoles('super_admin', 'department_admin'), createSubtask);
+
+// @route   GET /api/tasks/:id/subtasks
+// @desc    Get all subtasks for a given parent task
+// @access  All roles
+router.get('/:id/subtasks', getSubtasks);
+
+// @route   GET /api/tasks/:id/progress
+// @desc    Get progress of a parent task
+// @access  All roles
+router.get('/:id/progress', getTaskProgress);
+
+export default router;

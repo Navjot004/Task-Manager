@@ -1,0 +1,175 @@
+.tc-card {
+  background-color: #ffffff;
+  border-radius: 8px;
+  padding: 1.5rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.2s, box-shadow 0.2s;
+  cursor: pointer;
+  border-left: 4px solid #e2e8f0;
+}
+
+.tc-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+}
+
+/* Status Borders */
+.tc-border-red { border-left-color: #dc2626; }
+.tc-border-green { border-left-color: #10b981; }
+.tc-border-yellow { border-left-color: #f59e0b; }
+.tc-border-blue { border-left-color: #3b82f6; }
+.tc-border-gray { border-left-color: #94a3b8; }
+
+.tc-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.tc-type {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: #475569;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  text-transform: uppercase;
+}
+
+.tc-status-pill {
+  padding: 0.2rem 0.6rem;
+  border-radius: 12px;
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
+.tc-pill-red { background-color: #fee2e2; color: #b91c1c; }
+.tc-pill-green { background-color: #d1fae5; color: #047857; }
+.tc-pill-blue { background-color: #dbeafe; color: #1d4ed8; }
+.tc-pill-gray { background-color: #e2e8f0; color: #475569; }
+
+.tc-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #0f172a;
+  margin-bottom: 0.75rem;
+  line-height: 1.4;
+}
+
+.tc-title.completed {
+  text-decoration: line-through;
+  color: #64748b;
+}
+
+.tc-desc {
+  font-size: 0.85rem;
+  color: #475569;
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  flex: 1;
+  margin-bottom: 1.5rem;
+}
+
+.tc-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  border-top: 1px solid #f1f5f9;
+  padding-top: 1rem;
+  margin-top: auto;
+}
+
+.tc-footer-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.tc-footer-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.tc-assignee {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.tc-avatar {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background-color: #0f172a;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.55rem;
+  font-weight: 600;
+  overflow: hidden;
+}
+
+.tc-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.tc-assignee-id {
+  font-size: 0.8rem;
+  color: #334155;
+  font-weight: 500;
+}
+
+.tc-deadline {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: #334155;
+}
+
+.tc-deadline.overdue {
+  color: #dc2626;
+}
+
+/* Progress bar for subtasks */
+.tc-progress-container {
+  margin-top: 1rem;
+}
+
+.tc-progress-label {
+  font-size: 0.75rem;
+  color: #64748b;
+  margin-bottom: 0.25rem;
+  display: flex;
+  justify-content: space-between;
+}
+
+.tc-progress-bar {
+  height: 4px;
+  background-color: #e2e8f0;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.tc-progress-fill {
+  height: 100%;
+  background-color: #3b82f6;
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}

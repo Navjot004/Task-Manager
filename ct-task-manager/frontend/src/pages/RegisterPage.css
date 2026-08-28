@@ -1,0 +1,339 @@
+.register-page-container {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #f8fafc;
+  font-family: 'Inter', sans-serif;
+  padding: 1.5rem;
+}
+
+.register-card {
+  display: flex;
+  width: 100%;
+  max-width: 1000px;
+  background: #ffffff;
+  border-radius: 4px;
+  overflow: hidden;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.08);
+}
+
+/* LEFT PANEL (Desktop) */
+.register-left-panel {
+  flex: 1;
+  background-color: #031429;
+  background-image: 
+    linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+  color: #ffffff;
+  padding: 3rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.register-left-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 3.5rem;
+}
+
+.register-university-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #ffffff;
+  letter-spacing: 0.5px;
+}
+
+.register-left-body h2 {
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1.2;
+  margin-bottom: 1.5rem;
+  color: #ffffff;
+}
+
+.register-left-body p {
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: #94a3b8;
+  max-width: 95%;
+}
+
+.register-left-footer {
+  margin-top: auto;
+  background-color: rgba(3, 20, 41, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-left: 4px solid #34d399; /* Vibrant green accent */
+  padding: 1.5rem;
+  border-radius: 4px;
+  backdrop-filter: blur(8px);
+}
+
+.register-left-footer-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+  font-size: 1rem;
+  color: #ffffff;
+  margin-bottom: 0.5rem;
+}
+
+.register-left-footer p {
+  font-size: 0.85rem;
+  color: #cbd5e1;
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* RIGHT PANEL (Form) */
+.register-right-panel {
+  flex: 1.2;
+  padding: 3.5rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.register-right-panel h1 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #1e293b;
+  margin-bottom: 0.5rem;
+  display: none; /* Desktop uses left panel for main title, mobile uses its own header */
+}
+
+.register-mobile-header {
+  display: none;
+}
+
+.register-info-box-mobile {
+  display: none;
+}
+
+.register-row {
+  display: flex;
+  gap: 1.5rem;
+  margin-bottom: 1.25rem;
+}
+
+.register-form-group {
+  flex: 1;
+  margin-bottom: 1.25rem;
+}
+
+.register-row .register-form-group {
+  margin-bottom: 0;
+}
+
+.register-form-group label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 0.5rem;
+}
+
+.register-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.register-input-wrapper input,
+.register-input-wrapper select {
+  width: 100%;
+  padding: 0.875rem 1rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  font-size: 0.95rem;
+  color: #1e293b;
+  outline: none;
+  transition: all 0.2s;
+  font-family: inherit;
+  background-color: #ffffff;
+}
+
+.register-input-wrapper select {
+  appearance: none;
+  padding-right: 2.5rem;
+}
+
+.register-input-wrapper.with-icon input {
+  padding-left: 2.75rem;
+}
+
+.register-input-wrapper .input-icon-left {
+  position: absolute;
+  left: 1rem;
+  color: #94a3b8;
+  pointer-events: none;
+}
+
+.register-input-wrapper .input-icon-right {
+  position: absolute;
+  right: 0.5rem;
+  color: #94a3b8;
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0.5rem;
+  display: flex;
+  align-items: center;
+  transition: color 0.2s;
+}
+
+.register-input-wrapper .input-icon-right:hover {
+  color: #475569;
+}
+
+.register-input-wrapper .select-icon-right {
+  position: absolute;
+  right: 1rem;
+  color: #64748b;
+  pointer-events: none;
+}
+
+.register-input-wrapper input:focus,
+.register-input-wrapper select:focus {
+  border-color: #031429;
+  box-shadow: 0 0 0 3px rgba(3, 20, 41, 0.1);
+}
+
+.register-btn {
+  width: 100%;
+  background-color: #031429;
+  color: #ffffff;
+  border: none;
+  border-radius: 4px;
+  padding: 1rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 1rem;
+  transition: background-color 0.2s;
+}
+
+.register-btn:hover {
+  background-color: #020c19;
+}
+
+.register-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.register-login-link {
+  text-align: center;
+  margin-top: 1.5rem;
+  font-size: 0.9rem;
+  color: #475569;
+}
+
+.register-login-link a {
+  color: #031429;
+  font-weight: 600;
+  text-decoration: none;
+  margin-left: 0.25rem;
+}
+
+.register-login-link a:hover {
+  text-decoration: underline;
+}
+
+/* ERROR ALERT */
+.register-error-alert {
+  background-color: #fef2f2;
+  color: #991b1b;
+  padding: 0.75rem 1rem;
+  border-radius: 4px;
+  font-size: 0.875rem;
+  margin-bottom: 1.5rem;
+  border: 1px solid #fecaca;
+}
+
+.register-success-alert {
+  background-color: #f0fdf4;
+  color: #166534;
+  padding: 1.5rem;
+  border-radius: 4px;
+  border: 1px solid #bbf7d0;
+  text-align: center;
+}
+
+.register-success-alert h3 {
+  margin-bottom: 0.5rem;
+}
+
+/* RESPONSIVE DESIGN */
+@media (max-width: 900px) {
+  .register-card {
+    flex-direction: column;
+    max-width: 500px;
+    border-radius: 8px;
+  }
+
+  .register-left-panel {
+    display: none;
+  }
+
+  .register-right-panel {
+    padding: 2.5rem 2rem;
+  }
+
+  .register-row {
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .register-row .register-form-group {
+    margin-bottom: 1.25rem;
+  }
+
+  /* Mobile Headers */
+  .register-mobile-header {
+    display: block;
+    margin-bottom: 1.5rem;
+  }
+
+  .register-mobile-header h1 {
+    font-size: 1.25rem;
+    font-weight: 500;
+    color: #1e293b;
+    margin-bottom: 0.5rem;
+    display: block;
+  }
+
+  .register-mobile-header p {
+    font-size: 0.95rem;
+    color: #475569;
+    line-height: 1.5;
+  }
+
+  .register-info-box-mobile {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    background-color: #e2e8f0;
+    padding: 1rem;
+    border-radius: 6px;
+    margin-bottom: 2rem;
+  }
+
+  .register-info-box-mobile p {
+    font-size: 0.9rem;
+    color: #334155;
+    line-height: 1.5;
+    margin: 0;
+  }
+
+  .register-info-box-mobile svg {
+    color: #475569;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+}

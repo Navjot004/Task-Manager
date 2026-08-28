@@ -1,0 +1,106 @@
+import React from 'react';
+
+export type Urgency = 'RED' | 'YELLOW' | 'GREEN' | 'OVERDUE';
+
+/**
+ * Calculates task urgency dynamically based on the deadline.
+ * Rules:
+ *  - 0-5 days remaining: RED
+ *  - 6-10 days remaining: YELLOW
+ *  - 11+ days remaining: GREEN
+ *  - passed: OVERDUE
+ */
+export const calculateUrgency = (deadlineString: string): Urgency => {
+  const deadline = new Date(deadlineString);
+  const now = new Date();
+
+  // Reset time to start of day for pure date difference (optional, but consistent with day counting)
+  deadline.setHours(0, 0, 0, 0);
+  const today = new Date(now);
+  today.setHours(0, 0, 0, 0);
+
+  const diffTime = deadline.getTime() - today.getTime();
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+  if (diffDays < 0) {
+    return 'OVERDUE';
+  } else if (diffDays <= 5) {
+    return 'RED';
+  } else if (diffDays <= 10) {
+    return 'YELLOW';
+  } else {
+    return 'GREEN';
+  }
+};
+
+export const getUrgencyColor = (urgency: Urgency): string => {
+  switch (urgency) {
+    case 'RED': return '#ef4444'; // Tailwind red-500
+    case 'YELLOW': return '#eab308'; // Tailwind yellow-500
+    case 'GREEN': return '#22c55e'; // Tailwind green-500
+    case 'OVERDUE': return '#7f1d1d'; // Tailwind red-900
+    default: return '#6b7280'; // gray
+  }
+};
+
+export const getUrgencyBadgeClass = (urgency: Urgency): string => {
+  switch (urgency) {
+    case 'RED': return 'badge-danger';
+    case 'YELLOW': return 'badge-warning';
+    case 'GREEN': return 'badge-success';
+    case 'OVERDUE': return 'badge-dark'; // Assume a dark/strong styling
+    default: return 'badge-secondary';
+  }
+};
+
+/**
+ * Returns inline style object for task cards based on urgency.
+ * Used globally across all pages that display task cards.
+ */
+export const getUrgencyCardStyle = (urgency: Urgency): React.CSSProperties => {
+  switch (urgency) {
+    case 'RED':
+      return {
+        backgroundColor: '#fef2f2',
+        borderLeft: '4px solid #ef4444',
+        borderColor: '#fecaca',
+      };
+    case 'YELLOW':
+      return {
+        backgroundColor: '#fefce8',
+        borderLeft: '4px solid #eab308',
+        borderColor: '#fef08a',
+      };
+    case 'GREEN':
+      return {
+        backgroundColor: '#f0fdf4',
+        borderLeft: '4px solid #22c55e',
+        borderColor: '#bbf7d0',
+      };
+    case 'OVERDUE':
+      return {
+        backgroundColor: '#fef2f2',
+        borderLeft: '4px solid #991b1b',
+        borderColor: '#fca5a5',
+      };
+    default:
+      return {
+        backgroundColor: '#f8fafc',
+        borderLeft: '4px solid #94a3b8',
+        borderColor: '#e2e8f0',
+      };
+  }
+};
+
+/**
+ * Returns the priority label text for display.
+ */
+export const getUrgencyLabel = (urgency: Urgency): string => {
+  switch (urgency) {
+    case 'RED': return 'High Priority';
+    case 'YELLOW': return 'Medium Priority';
+    case 'GREEN': return 'Low Priority';
+    case 'OVERDUE': return 'Overdue';
+    default: return '';
+  }
+};

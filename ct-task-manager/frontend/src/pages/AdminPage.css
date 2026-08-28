@@ -1,0 +1,353 @@
+.admin-dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+@media (min-width: 1024px) {
+  .admin-dashboard {
+    flex-direction: row;
+  }
+}
+
+.admin-main-column {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.admin-side-column {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+@media (min-width: 1024px) {
+  .admin-side-column {
+    width: 320px;
+  }
+}
+
+/* Widgets */
+.admin-widgets-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1.5rem;
+}
+
+.admin-widget {
+  background-color: white;
+  border-radius: 0.75rem;
+  padding: 1.5rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  border: 1px solid #e2e8f0;
+  display: flex;
+  flex-direction: column;
+}
+
+.admin-widget-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1rem;
+}
+
+.admin-widget-title {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  max-width: 70%;
+}
+
+.admin-widget-icon {
+  color: #0f172a;
+}
+
+.admin-widget-value {
+  font-size: 2.25rem;
+  font-weight: 700;
+  color: #0f172a;
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.admin-widget-sub {
+  font-size: 0.875rem;
+  color: #64748b;
+  margin-top: 0.25rem;
+}
+
+.admin-widget-trend {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #10b981;
+}
+
+.admin-widget-bars {
+  display: flex;
+  gap: 0.25rem;
+  margin-top: 1rem;
+  height: 4px;
+}
+.admin-widget-bar {
+  flex: 1;
+  border-radius: 2px;
+}
+
+/* Tasks Section */
+.admin-section {
+  background-color: white;
+  border-radius: 0.75rem;
+  padding: 1.5rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  border: 1px solid #e2e8f0;
+}
+
+.admin-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1.5rem;
+}
+
+.admin-section-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0;
+}
+.admin-section-subtitle {
+  font-size: 0.875rem;
+  color: #64748b;
+  margin-top: 0.25rem;
+}
+
+.admin-section-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.admin-btn-outline {
+  background: white;
+  border: 1px solid #cbd5e1;
+  color: #475569;
+  padding: 0.5rem 1rem;
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.admin-btn-outline:hover {
+  background: #f1f5f9;
+}
+.admin-btn-filled {
+  background: #e0e7ff;
+  border: 1px solid #c7d2fe;
+  color: #4338ca;
+  padding: 0.5rem 1rem;
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+
+/* Task Item */
+.admin-task-item {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.5rem;
+  padding: 1.25rem;
+  margin-bottom: 1rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.admin-task-indicator {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+}
+
+.admin-task-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.admin-task-meta {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.admin-badge {
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.25rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.admin-badge-red { background: #fee2e2; color: #dc2626; }
+.admin-badge-blue { background: #e0e7ff; color: #4338ca; }
+.admin-badge-green { background: #dcfce7; color: #16a34a; }
+
+.admin-task-due {
+  color: #64748b;
+}
+
+.admin-task-subtasks {
+  background: #e2e8f0;
+  color: #475569;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.admin-task-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #0f172a;
+  margin-bottom: 0.5rem;
+}
+
+.admin-task-desc {
+  font-size: 0.875rem;
+  color: #475569;
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* Team Availability */
+.admin-team-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  margin-bottom: 1.5rem;
+}
+
+.admin-team-item {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.admin-team-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background-size: cover;
+  background-position: center;
+  position: relative;
+}
+
+.admin-team-status {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 2px solid white;
+}
+.status-green { background: #10b981; }
+.status-gray { background: #94a3b8; }
+.status-red { background: #ef4444; }
+
+.admin-team-info {
+  flex: 1;
+}
+
+.admin-team-name {
+  font-weight: 600;
+  color: #0f172a;
+  font-size: 0.875rem;
+}
+
+.admin-team-role {
+  font-size: 0.75rem;
+  color: #64748b;
+  margin-top: 0.125rem;
+}
+
+.admin-team-load {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.125rem 0.4rem;
+  border-radius: 9999px;
+}
+.load-high { background: #dcfce7; color: #16a34a; }
+.load-medium { background: #e0e7ff; color: #4338ca; }
+.load-zero { background: #fee2e2; color: #dc2626; }
+
+.admin-btn-full {
+  width: 100%;
+  padding: 0.75rem;
+  background: white;
+  border: 1px solid #cbd5e1;
+  color: #0f172a;
+  font-weight: 600;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.admin-btn-full:hover {
+  background: #f8fafc;
+}
+
+/* Upcoming Deadline Card */
+.admin-deadline-card {
+  background: #0f172a;
+  color: white;
+  border-radius: 0.75rem;
+  padding: 1.5rem;
+}
+
+.admin-deadline-icon {
+  margin-bottom: 1rem;
+  color: #e2e8f0;
+}
+
+.admin-deadline-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.admin-deadline-desc {
+  font-size: 0.875rem;
+  color: #94a3b8;
+  line-height: 1.5;
+  margin-bottom: 1.5rem;
+}
+
+.admin-btn-white {
+  background: white;
+  color: #0f172a;
+  font-weight: 600;
+  padding: 0.625rem 1rem;
+  border-radius: 0.375rem;
+  border: none;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.admin-btn-white:hover {
+  background: #f1f5f9;
+}
