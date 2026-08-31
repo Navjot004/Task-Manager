@@ -8,6 +8,8 @@ A comprehensive, multi-role task management system designed specifically for uni
   - **Super Admin**: Has a global view of all tasks, can create/assign tasks directly to anyone, and provides the final approval on completed tasks.
   - **Department Admin**: Manages their specific team of staff, assigns tasks to their team, and performs the first-stage review of completed tasks.
   - **Staff**: Can view their assigned tasks, manage subtasks, and submit tasks for review once completed.
+- **NAAC Dashboard**: A dedicated visualization for the Super Admin providing a high-level view of departmental progress, complete with Key Performance Indicators (KPIs), grouped bar charts, and interactive drill-downs by department and team members.
+- **Dynamic Team Hierarchy**: The organizational structure dynamically reflects the database's staff assignment hierarchy, linking staff directly to their managing Department Admins for accurate reporting.
 - **Dynamic Urgency Tracking**:
   - 🔴 **Red (Critical)**: Deadline is within 5 days or overdue.
   - 🟡 **Yellow (Warning)**: Deadline is between 6 and 10 days.
