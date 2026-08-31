@@ -369,14 +369,13 @@ export const api = {
 
   // ─── Tasks ────────────────────────────────────────────
 
-  createTask: async (taskData: { title: string; description: string; deadline: string; assignedTo?: string | null }): Promise<{ success: boolean; message: string; data: any }> => {
+  createTask: async (taskData: FormData): Promise<{ success: boolean; message: string; data: any }> => {
     const response = await fetch(`${API_URL}/api/tasks`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
         'Authorization': `Bearer ${tokenStorage.getToken()}`
       },
-      body: JSON.stringify(taskData),
+      body: taskData,
     });
     const json = await response.json();
     if (!response.ok) throw new Error(json.message || 'Failed to create task');
@@ -443,12 +442,13 @@ export const api = {
     return json;
   },
 
-  submitTaskForReview: async (id: string): Promise<{ success: boolean; message: string; data: any }> => {
+  submitTaskForReview: async (id: string, formData?: FormData): Promise<{ success: boolean; message: string; data: any }> => {
     const response = await fetch(`${API_URL}/api/tasks/${id}/submit-review`, {
       method: 'PATCH',
       headers: {
         'Authorization': `Bearer ${tokenStorage.getToken()}`
       },
+      body: formData || null,
     });
     const json = await response.json();
     if (!response.ok) throw new Error(json.message || 'Failed to submit task for review');

@@ -11,6 +11,25 @@
   align-items: flex-start;
 }
 
+.ct-back-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: none;
+  border: none;
+  color: #64748b;
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+  padding: 0;
+  margin-bottom: 1rem;
+  transition: color 0.2s;
+}
+
+.ct-back-btn:hover {
+  color: #0f172a;
+}
+
 .ct-title-area h1 {
   font-size: 2rem;
   color: #0f172a;
@@ -221,6 +240,7 @@
   color: #64748b;
   cursor: pointer;
   transition: all 0.2s;
+  margin-bottom: 1rem;
 }
 
 .ct-upload-area:hover {
@@ -235,6 +255,75 @@
 .ct-upload-area p {
   margin: 0;
   font-size: 0.85rem;
+}
+
+/* File List */
+.ct-files-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.ct-file-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: #f1f5f9;
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  color: #334155;
+}
+
+.ct-file-item button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #64748b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.ct-file-item button:hover {
+  color: #b91c1c;
+}
+
+.ct-file-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 200px;
+}
+
+/* Extensions Grid */
+.ct-extensions-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.ct-ext-btn {
+  background-color: #f8fafc;
+  border: 1px solid #e2e8f0;
+  color: #475569;
+  padding: 0.25rem 0.75rem;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.ct-ext-btn:hover {
+  background-color: #f1f5f9;
+}
+
+.ct-ext-btn.active {
+  background-color: #0f172a;
+  color: #ffffff;
+  border-color: #0f172a;
 }
 
 /* Footer Actions */

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { 
   LayoutDashboard, 
@@ -6,13 +6,16 @@ import {
   Settings, 
   Search, 
   Bell, 
-  Shield
+  Shield,
+  Menu,
+  X
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import './StaffLayout.css';
 
 const StaffLayout: React.FC = () => {
   const { currentUser: user } = useAuth();
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
   const navLinks = [
     { to: "/staff", icon: <LayoutDashboard size={20} />, label: "Dashboard", end: true },
@@ -22,8 +25,15 @@ const StaffLayout: React.FC = () => {
 
   return (
     <div className="staff-layout">
-      {/* Desktop Sidebar */}
-      <aside className="staff-sidebar">
+      {isMobileSidebarOpen && (
+        <div 
+          className="staff-sidebar-overlay" 
+          onClick={() => setIsMobileSidebarOpen(false)} 
+        />
+      )}
+
+      {/* Desktop & Mobile Sidebar */}
+      <aside className={`staff-sidebar ${isMobileSidebarOpen ? 'mobile-open' : ''}`}>
         <div className="staff-sidebar-brand">
           <div className="staff-brand-icon">
             <Shield size={20} />
@@ -41,6 +51,7 @@ const StaffLayout: React.FC = () => {
               to={link.to}
               end={link.end}
               className={({ isActive }) => `staff-nav-item ${isActive ? 'active' : ''}`}
+              onClick={() => setIsMobileSidebarOpen(false)}
             >
               {link.icon}
               {link.label}
@@ -57,8 +68,16 @@ const StaffLayout: React.FC = () => {
       <main className="staff-main">
         {/* Top Navbar */}
         <header className="staff-topbar">
-          <div className="staff-search">
-            <Search className="staff-search-icon" size={20} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', width: '100%' }}>
+            <button 
+              className="staff-mobile-menu-btn"
+              onClick={() => setIsMobileSidebarOpen(true)}
+            >
+              <Menu size={24} />
+            </button>
+            <div className="staff-search">
+              <Search className="staff-search-icon" size={20} />
+            </div>
           </div>
 
           <div className="staff-topbar-right">
@@ -87,21 +106,6 @@ const StaffLayout: React.FC = () => {
           <Outlet />
         </div>
       </main>
-
-      {/* Mobile Bottom Navigation */}
-      <nav className="staff-mobile-nav">
-        {navLinks.map((link) => (
-          <NavLink
-            key={link.to}
-            to={link.to}
-            end={link.end}
-            className={({ isActive }) => `staff-mobile-nav-item ${isActive ? 'active' : ''}`}
-          >
-            {link.icon}
-            {link.label}
-          </NavLink>
-        ))}
-      </nav>
     </div>
   );
 };

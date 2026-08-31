@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { 
@@ -13,13 +13,15 @@ import {
   Search,
   Bell,
   Menu,
-  LogOut
+  LogOut,
+  X
 } from 'lucide-react';
 import './SuperAdminLayout.css';
 
 const SuperAdminLayout: React.FC = () => {
   const { logout, currentUser } = useAuth();
   const navigate = useNavigate();
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
   const handleLogout = () => {
     logout();
@@ -32,8 +34,15 @@ const SuperAdminLayout: React.FC = () => {
 
   return (
     <div className="sa-layout-container">
-      {/* Sidebar (Desktop) */}
-      <aside className="sa-sidebar">
+      {isMobileSidebarOpen && (
+        <div 
+          className="sa-sidebar-overlay" 
+          onClick={() => setIsMobileSidebarOpen(false)} 
+        />
+      )}
+
+      {/* Sidebar (Desktop & Mobile) */}
+      <aside className={`sa-sidebar ${isMobileSidebarOpen ? 'mobile-open' : ''}`}>
         <div className="sa-sidebar-header">
           <div className="sa-sidebar-logo">
             <Building2 size={20} />
@@ -44,26 +53,26 @@ const SuperAdminLayout: React.FC = () => {
         <div className="sa-sidebar-section-title">Super Admin</div>
         
         <nav className="sa-sidebar-nav">
-          <NavLink to="/super-admin" end className={({ isActive }) => `sa-nav-item ${isActive ? 'active' : ''}`}>
+          <NavLink to="/super-admin" end className={({ isActive }) => `sa-nav-item ${isActive ? 'active' : ''}`} onClick={() => setIsMobileSidebarOpen(false)}>
             <LayoutDashboard size={18} /> Dashboard
           </NavLink>
-          <NavLink to="/super-admin/tasks" className={({ isActive }) => `sa-nav-item ${isActive ? 'active' : ''}`}>
+          <NavLink to="/super-admin/tasks" className={({ isActive }) => `sa-nav-item ${isActive ? 'active' : ''}`} onClick={() => setIsMobileSidebarOpen(false)}>
             <FileText size={18} /> Tasks
           </NavLink>
-          <NavLink to="/super-admin/users" className={({ isActive }) => `sa-nav-item ${isActive ? 'active' : ''}`}>
+          <NavLink to="/super-admin/users" className={({ isActive }) => `sa-nav-item ${isActive ? 'active' : ''}`} onClick={() => setIsMobileSidebarOpen(false)}>
             <Users size={18} /> Users
           </NavLink>
 
-          <NavLink to="/super-admin/verified-users" className={({ isActive }) => `sa-nav-item ${isActive ? 'active' : ''}`}>
+          <NavLink to="/super-admin/verified-users" className={({ isActive }) => `sa-nav-item ${isActive ? 'active' : ''}`} onClick={() => setIsMobileSidebarOpen(false)}>
             <ShieldCheck size={18} /> Verified Users
           </NavLink>
-          <NavLink to="/super-admin/staff-manage" className={({ isActive }) => `sa-nav-item ${isActive ? 'active' : ''}`}>
+          <NavLink to="/super-admin/staff-manage" className={({ isActive }) => `sa-nav-item ${isActive ? 'active' : ''}`} onClick={() => setIsMobileSidebarOpen(false)}>
             <UserPlus size={18} /> Manage Staff
           </NavLink>
-          <NavLink to="/super-admin/departments" className={({ isActive }) => `sa-nav-item ${isActive ? 'active' : ''}`}>
+          <NavLink to="/super-admin/departments" className={({ isActive }) => `sa-nav-item ${isActive ? 'active' : ''}`} onClick={() => setIsMobileSidebarOpen(false)}>
             <Building size={18} /> Departments
           </NavLink>
-          <NavLink to="/super-admin/settings" className={({ isActive }) => `sa-nav-item ${isActive ? 'active' : ''}`}>
+          <NavLink to="/super-admin/settings" className={({ isActive }) => `sa-nav-item ${isActive ? 'active' : ''}`} onClick={() => setIsMobileSidebarOpen(false)}>
             <Settings size={18} /> Settings
           </NavLink>
         </nav>
@@ -78,9 +87,17 @@ const SuperAdminLayout: React.FC = () => {
       <main className="sa-main-content">
         {/* Top Navbar */}
         <header className="sa-topbar">
-          <div className="sa-search-wrapper">
-            <Search size={16} className="sa-search-icon" />
-            <input type="text" placeholder="Search tasks, staff, or departments..." className="sa-search-input" />
+          <div className="sa-topbar-left">
+            <button 
+              className="sa-mobile-menu-btn" 
+              onClick={() => setIsMobileSidebarOpen(true)}
+            >
+              <Menu size={24} />
+            </button>
+            <div className="sa-search-wrapper">
+              <Search size={16} className="sa-search-icon" />
+              <input type="text" placeholder="Search tasks, staff, or departments..." className="sa-search-input" />
+            </div>
           </div>
           <div className="sa-topbar-right">
             <button className="sa-notification-btn">
@@ -105,26 +122,6 @@ const SuperAdminLayout: React.FC = () => {
           <Outlet />
         </div>
       </main>
-
-      {/* Mobile Bottom Navigation */}
-      <nav className="sa-mobile-nav">
-        <NavLink to="/super-admin" end className={({ isActive }) => `sa-mobile-nav-item ${isActive ? 'active' : ''}`}>
-          <LayoutDashboard size={20} />
-          <span>Dashboard</span>
-        </NavLink>
-        <NavLink to="/super-admin/tasks" className={({ isActive }) => `sa-mobile-nav-item ${isActive ? 'active' : ''}`}>
-          <FileText size={20} />
-          <span>Tasks</span>
-        </NavLink>
-        <NavLink to="/super-admin/alerts" className={({ isActive }) => `sa-mobile-nav-item ${isActive ? 'active' : ''}`}>
-          <Bell size={20} />
-          <span>Alerts</span>
-        </NavLink>
-        <NavLink to="/super-admin/more" className={({ isActive }) => `sa-mobile-nav-item ${isActive ? 'active' : ''}`}>
-          <Menu size={20} />
-          <span>More</span>
-        </NavLink>
-      </nav>
     </div>
   );
 };

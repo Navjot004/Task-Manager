@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import Task from '../models/Task';
 import User from '../models/User';
 import StaffAssignment from '../models/StaffAssignment';
+import mongoose from 'mongoose';
 
 /** Helper to check if a Department Admin can assign/manage a specific staff member */
 const checkAdminStaffPermission = async (adminId: string, staffId: string) => {
@@ -19,6 +20,7 @@ const checkAdminStaffPermission = async (adminId: string, staffId: string) => {
 export const createTask = async (req: Request, res: Response) => {
   try {
     const { title, description, deadline, assignedTo } = req.body;
+    let { requiredCompletionExtensions, isSubtask, parentTaskId } = req.body;
     const user = req.user;
 
     // Staff cannot create tasks
@@ -35,8 +37,33 @@ export const createTask = async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, message: 'Invalid deadline date.' });
     }
 
+    let parsedExtensions: string[] = [];
+    if (requiredCompletionExtensions) {
+      try {
+        parsedExtensions = JSON.parse(requiredCompletionExtensions);
+      } catch (e) {
+        // If not a JSON string, it might just be a comma-separated string or array
+        if (Array.isArray(requiredCompletionExtensions)) {
+          parsedExtensions = requiredCompletionExtensions;
+        } else if (typeof requiredCompletionExtensions === 'string') {
+          parsedExtensions = requiredCompletionExtensions.split(',').map(s => s.trim());
+        }
+      }
+    }
+
     let workflowType = undefined;
     let finalAssignee = null;
+    let parsedIsSubtask = isSubtask === 'true' || isSubtask === true;
+
+    if (parsedIsSubtask) {
+      if (!parentTaskId) {
+        return res.status(400).json({ success: false, message: 'Parent Task is required for subtasks.' });
+      }
+      const parent = await Task.findById(parentTaskId);
+      if (!parent || parent.isSubtask) {
+        return res.status(400).json({ success: false, message: 'Invalid Parent Task.' });
+      }
+    }
 
     if (assignedTo) {
       const targetUser = await User.findById(assignedTo);
@@ -66,6 +93,31 @@ export const createTask = async (req: Request, res: Response) => {
       }
     }
 
+    // Handle File Uploads via GridFSBucket
+    const attachmentIds: mongoose.Types.ObjectId[] = [];
+    if (req.files && Array.isArray(req.files) && req.files.length > 0) {
+      const db = mongoose.connection.db;
+      if (db) {
+        const bucket = new mongoose.mongo.GridFSBucket(db, {
+          bucketName: 'attachments'
+        });
+        
+        for (const file of req.files) {
+          await new Promise<void>((resolve, reject) => {
+            const uploadStream = bucket.openUploadStream(file.originalname, {
+              contentType: file.mimetype
+            });
+            uploadStream.end(file.buffer);
+            uploadStream.on('finish', () => {
+              attachmentIds.push(uploadStream.id as mongoose.Types.ObjectId);
+              resolve();
+            });
+            uploadStream.on('error', reject);
+          });
+        }
+      }
+    }
+
     const task = new Task({
       title,
       description,
@@ -73,13 +125,18 @@ export const createTask = async (req: Request, res: Response) => {
       createdBy: user._id,
       assignedTo: finalAssignee,
       workflowType,
+      attachments: attachmentIds,
+      requiredCompletionExtensions: parsedExtensions,
+      isSubtask: parsedIsSubtask,
+      parentTaskId: parsedIsSubtask ? parentTaskId : null
     });
 
     await task.save();
 
     const populatedTask = await Task.findById(task._id)
       .populate('createdBy', 'name role')
-      .populate('assignedTo', 'name role department');
+      .populate('assignedTo', 'name role department')
+      .populate('parentTaskId', 'taskId title');
 
     return res.status(201).json({ success: true, data: { task: populatedTask } });
   } catch (error) {
@@ -179,6 +236,7 @@ export const getTasks = async (req: Request, res: Response) => {
     const tasks = await Task.find(query)
       .populate('createdBy', 'name role')
       .populate('assignedTo', 'name role department')
+      .populate('parentTaskId', 'taskId title')
       .sort({ deadline: 1, createdAt: -1 })
       .skip((page - 1) * limit)
       .limit(limit);
@@ -201,7 +259,8 @@ export const getTaskById = async (req: Request, res: Response) => {
   try {
     const task = await Task.findById(req.params.id)
       .populate('createdBy', 'name role')
-      .populate('assignedTo', 'name role department');
+      .populate('assignedTo', 'name role department')
+      .populate('parentTaskId', 'taskId title');
       
     if (!task) return res.status(404).json({ success: false, message: 'Task not found' });
 
@@ -338,7 +397,8 @@ export const assignTask = async (req: Request, res: Response) => {
 
     const populatedTask = await Task.findById(task._id)
       .populate('createdBy', 'name role')
-      .populate('assignedTo', 'name role department');
+      .populate('assignedTo', 'name role department')
+      .populate('parentTaskId', 'taskId title');
 
     return res.status(200).json({ success: true, data: { task: populatedTask } });
   } catch (error) {
@@ -415,6 +475,57 @@ export const submitReview = async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, message: 'Task must be completed before submission.' });
     }
 
+    // Validate required extensions if any
+    if (task.requiredCompletionExtensions && task.requiredCompletionExtensions.length > 0) {
+      const files = req.files as Express.Multer.File[] || [];
+      const fileExts = files.map(f => {
+        const parts = f.originalname.split('.');
+        return '.' + parts[parts.length - 1].toLowerCase();
+      });
+
+      // Check if all required extensions are met, OR at least the files provided match the required extensions.
+      // Usually, it means "If there are required extensions, the uploaded files must have those extensions."
+      // Let's ensure every uploaded file has an allowed extension (if restricted) and maybe at least one file is uploaded if required.
+      if (files.length === 0) {
+        return res.status(400).json({ success: false, message: `Attachments required with formats: ${task.requiredCompletionExtensions.join(', ')}` });
+      }
+
+      for (const ext of fileExts) {
+        if (!task.requiredCompletionExtensions.includes(ext)) {
+          return res.status(400).json({ 
+            success: false, 
+            message: `Invalid file format: ${ext}. Allowed formats are: ${task.requiredCompletionExtensions.join(', ')}` 
+          });
+        }
+      }
+    }
+
+    // Handle File Uploads via GridFSBucket for completionAttachments
+    const attachmentIds: mongoose.Types.ObjectId[] = [];
+    if (req.files && Array.isArray(req.files) && req.files.length > 0) {
+      const db = mongoose.connection.db;
+      if (db) {
+        const bucket = new mongoose.mongo.GridFSBucket(db, {
+          bucketName: 'attachments'
+        });
+        
+        for (const file of req.files) {
+          await new Promise<void>((resolve, reject) => {
+            const uploadStream = bucket.openUploadStream(file.originalname, {
+              contentType: file.mimetype
+            });
+            uploadStream.end(file.buffer);
+            uploadStream.on('finish', () => {
+              attachmentIds.push(uploadStream.id as mongoose.Types.ObjectId);
+              resolve();
+            });
+            uploadStream.on('error', reject);
+          });
+        }
+      }
+    }
+
+    task.completionAttachments = [...(task.completionAttachments || []), ...attachmentIds];
     task.status = 'submitted_for_review';
     task.reviewRequestedBy = user._id;
 
@@ -602,7 +713,8 @@ export const createSubtask = async (req: Request, res: Response) => {
 
     const populatedSubtask = await Task.findById(subtask._id)
       .populate('createdBy', 'name role')
-      .populate('assignedTo', 'name role department');
+      .populate('assignedTo', 'name role department')
+      .populate('parentTaskId', 'taskId title');
 
     return res.status(201).json({ success: true, data: { task: populatedSubtask } });
   } catch (error) {
@@ -640,6 +752,7 @@ export const getSubtasks = async (req: Request, res: Response) => {
     const subtasks = await Task.find(query)
       .populate('createdBy', 'name role')
       .populate('assignedTo', 'name role department')
+      .populate('parentTaskId', 'taskId title')
       .sort({ createdAt: -1 });
 
     return res.status(200).json({ success: true, data: { subtasks } });

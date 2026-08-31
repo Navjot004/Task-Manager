@@ -13,6 +13,7 @@ import {
   getTaskProgress
 } from '../controllers/taskController';
 import { authenticate, authorizeRoles } from '../middleware/auth';
+import { uploadAny } from '../middleware/upload';
 
 const router = Router();
 
@@ -21,7 +22,7 @@ router.use(authenticate);
 // @route   POST /api/tasks
 // @desc    Create a task
 // @access  Super Admin, Department Admin
-router.post('/', authorizeRoles('super_admin', 'department_admin'), createTask);
+router.post('/', authorizeRoles('super_admin', 'department_admin'), uploadAny.array('attachments'), createTask);
 
 // @route   GET /api/tasks
 // @desc    Get all visible tasks with filtering/pagination
@@ -49,9 +50,9 @@ router.patch('/:id/assign', authorizeRoles('super_admin', 'department_admin'), a
 router.patch('/:id/status', updateTaskStatus);
 
 // @route   PATCH /api/tasks/:id/submit-review
-// @desc    Submit a task for review
-// @access  Assignee only (verified in controller)
-router.patch('/:id/submit-review', submitReview);
+// @desc    Submit a task for review (and upload completion attachments)
+// @access  Assignee only
+router.patch('/:id/submit-review', uploadAny.array('attachments'), submitReview);
 
 // @route   PATCH /api/tasks/:id/review
 // @desc    Approve or reject a task

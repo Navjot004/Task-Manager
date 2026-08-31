@@ -76,7 +76,7 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onClick }) => {
           {task.isSubtask ? (
             <><CornerDownRight size={14} /> SUBTASK</>
           ) : (
-             'MAIN TASK'
+            <span style={{ fontWeight: 800 }}>#{task.taskId}</span>
           )}
         </div>
         
@@ -91,8 +91,16 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onClick }) => {
       </div>
       
       <h3 className={`tc-title ${isCompleted ? 'completed' : ''}`}>
+        {task.isSubtask && <span style={{ color: '#64748b', marginRight: '0.4rem' }}>#{task.taskId}</span>}
         {task.title}
       </h3>
+
+      {task.isSubtask && task.parentTaskId && (
+        <div style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+          <CornerDownRight size={12} />
+          Subtask of #{task.parentTaskId.taskId} - {task.parentTaskId.title}
+        </div>
+      )}
       
       <div className="tc-desc">
         {task.description}

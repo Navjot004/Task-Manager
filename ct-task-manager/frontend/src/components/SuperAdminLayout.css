@@ -126,6 +126,21 @@
   z-index: 5;
 }
 
+.sa-topbar-left {
+  display: flex;
+  align-items: center;
+}
+
+.sa-mobile-menu-btn {
+  display: none;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #1e293b;
+  padding: 0;
+  margin-right: 1rem;
+}
+
 .sa-search-wrapper {
   position: relative;
   width: 400px;
@@ -235,7 +250,33 @@
 /* RESPONSIVE */
 @media (max-width: 900px) {
   .sa-sidebar {
-    display: none;
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: -260px;
+    z-index: 100;
+    transition: left 0.3s ease;
+    display: flex;
+  }
+
+  .sa-sidebar.mobile-open {
+    left: 0;
+    box-shadow: 4px 0 10px rgba(0,0,0,0.1);
+  }
+
+  .sa-sidebar-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 90;
+  }
+
+  .sa-mobile-menu-btn {
+    display: flex;
+    align-items: center;
   }
 
   .sa-topbar {
@@ -252,36 +293,9 @@
 
   .sa-content-scroll {
     padding: 1rem;
-    padding-bottom: 80px; /* space for bottom nav */
   }
 
   .sa-mobile-nav {
-    display: flex;
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    height: 65px;
-    background-color: #f8fafc;
-    border-top: 1px solid #e2e8f0;
-    z-index: 20;
-    justify-content: space-around;
-    align-items: center;
-  }
-
-  .sa-mobile-nav-item {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.25rem;
-    color: #64748b;
-    text-decoration: none;
-    font-size: 0.7rem;
-    font-weight: 500;
-    padding: 0.5rem;
-  }
-
-  .sa-mobile-nav-item.active {
-    color: #0f172a;
+    display: none !important;
   }
 }

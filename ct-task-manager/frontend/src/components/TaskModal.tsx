@@ -33,12 +33,19 @@ const TaskModal: React.FC<TaskModalProps> = ({ task, onClose, onRefresh, current
   const [isRejecting, setIsRejecting] = useState(false);
   const [rejectionReason, setRejectionReason] = useState('');
 
+  // Submit Review mode
+  const [isSubmittingReview, setIsSubmittingReview] = useState(false);
+  const [reviewFiles, setReviewFiles] = useState<File[]>([]);
+  const reviewFileInputRef = React.useRef<HTMLInputElement>(null);
+
   // Reset local state when task changes
   useEffect(() => {
     setIsEditing(false);
     setIsAssigning(false);
     setIsRejecting(false);
     setRejectionReason('');
+    setIsSubmittingReview(false);
+    setReviewFiles([]);
     setEditData({
       title: task.title,
       description: task.description,
@@ -151,7 +158,14 @@ const TaskModal: React.FC<TaskModalProps> = ({ task, onClose, onRefresh, current
     try {
       setLoading(true);
       setError('');
-      await api.submitTaskForReview(task._id);
+      let formData: FormData | undefined = undefined;
+      if (reviewFiles.length > 0) {
+        formData = new FormData();
+        reviewFiles.forEach(f => formData!.append('attachments', f));
+      }
+      await api.submitTaskForReview(task._id, formData);
+      setIsSubmittingReview(false);
+      setReviewFiles([]);
       onRefresh();
     } catch (err: any) {
       setError(err.message);
@@ -207,11 +221,18 @@ const TaskModal: React.FC<TaskModalProps> = ({ task, onClose, onRefresh, current
           <>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
               <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 700, color: '#0f172a', paddingRight: '2rem' }}>
+                <span style={{ color: '#64748b', marginRight: '0.5rem' }}>#{task.taskId}</span>
                 {task.title}
                 {task.isSubtask && <span style={{ fontSize: '0.7rem', backgroundColor: '#e2e8f0', color: '#475569', padding: '0.2rem 0.6rem', borderRadius: '4px', marginLeft: '0.5rem', verticalAlign: 'middle' }}>SUBTASK</span>}
               </h2>
               <span className={`badge ${badgeClass}`} style={{ flexShrink: 0 }}>{urgency}</span>
             </div>
+
+            {task.isSubtask && task.parentTaskId && (
+              <div style={{ fontSize: '0.85rem', color: '#64748b', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                <span style={{ fontWeight: 600 }}>Subtask of:</span> #{task.parentTaskId.taskId} - {task.parentTaskId.title}
+              </div>
+            )}
             
             <p style={{ whiteSpace: 'pre-wrap', backgroundColor: '#f8fafc', padding: '1rem', borderRadius: '8px', margin: '1rem 0', color: '#334155', lineHeight: '1.6', border: '1px solid #e2e8f0' }}>
               {task.description}
@@ -254,6 +275,17 @@ const TaskModal: React.FC<TaskModalProps> = ({ task, onClose, onRefresh, current
                 </div>
               )}
               
+              {task.requiredCompletionExtensions && task.requiredCompletionExtensions.length > 0 && (
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <div style={{ fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 600, marginBottom: '0.25rem' }}>Required Completion Formats</div>
+                  <div style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap' }}>
+                    {task.requiredCompletionExtensions.map((ext: string) => (
+                      <span key={ext} style={{ fontSize: '0.75rem', backgroundColor: '#e2e8f0', padding: '0.1rem 0.4rem', borderRadius: '4px', color: '#475569' }}>{ext}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
             </div>
 
             <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0', paddingTop: '1.5rem', borderTop: '1px solid #e2e8f0', flexWrap: 'wrap', alignItems: 'center' }}>
@@ -282,13 +314,50 @@ const TaskModal: React.FC<TaskModalProps> = ({ task, onClose, onRefresh, current
 
               {/* Performer Actions */}
               {canPerformStaffActions && !isAssigning && (
-                <div style={{ display: 'flex', gap: '0.5rem', marginLeft: 'auto' }}>
-                  {task.status === 'pending' && <button className="btn btn-primary" onClick={() => handleStatusChange('in_progress')} disabled={loading}>Start Task</button>}
-                  {task.status === 'rejected' && <button className="btn btn-primary" onClick={() => handleStatusChange('in_progress')} disabled={loading}>Start Again</button>}
-                  {task.status === 'in_progress' && <button className="btn btn-success" onClick={() => handleStatusChange('completed')} disabled={loading} style={{ backgroundColor: '#10b981', color: 'white' }}>Mark Completed</button>}
-                  {task.status === 'completed' && <button className="btn btn-success" onClick={handleSubmitReview} disabled={loading} style={{ backgroundColor: '#3b82f6', color: 'white' }}>Submit for Review</button>}
-                  {task.status === 'submitted_for_review' && <span style={{ color: '#d97706', fontWeight: 'bold' }}>Waiting for Review</span>}
-                  {task.status === 'approved' && <span style={{ color: '#059669', fontWeight: 'bold' }}>Approved</span>}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginLeft: 'auto', alignItems: 'flex-end', width: '100%' }}>
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    {task.status === 'pending' && <button className="btn btn-primary" onClick={() => handleStatusChange('in_progress')} disabled={loading}>Start Task</button>}
+                    {task.status === 'rejected' && <button className="btn btn-primary" onClick={() => handleStatusChange('in_progress')} disabled={loading}>Start Again</button>}
+                    {task.status === 'in_progress' && <button className="btn btn-success" onClick={() => handleStatusChange('completed')} disabled={loading} style={{ backgroundColor: '#10b981', color: 'white' }}>Mark Completed</button>}
+                    {task.status === 'completed' && !isSubmittingReview && <button className="btn btn-success" onClick={() => setIsSubmittingReview(true)} disabled={loading} style={{ backgroundColor: '#3b82f6', color: 'white' }}>Submit for Review</button>}
+                    {task.status === 'submitted_for_review' && <span style={{ color: '#d97706', fontWeight: 'bold' }}>Waiting for Review</span>}
+                    {task.status === 'approved' && <span style={{ color: '#059669', fontWeight: 'bold' }}>Approved</span>}
+                  </div>
+                  
+                  {isSubmittingReview && (
+                    <div style={{ backgroundColor: '#f8fafc', padding: '1rem', borderRadius: '8px', border: '1px solid #e2e8f0', width: '100%', marginTop: '0.5rem' }}>
+                      <h4 style={{ margin: '0 0 0.5rem 0' }}>Upload Completion Documents</h4>
+                      {task.requiredCompletionExtensions && task.requiredCompletionExtensions.length > 0 && (
+                        <p style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: '1rem' }}>Required formats: {task.requiredCompletionExtensions.join(', ')}</p>
+                      )}
+                      
+                      <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
+                        <div style={{ flex: 1 }}>
+                          <input 
+                            type="file" 
+                            multiple 
+                            ref={reviewFileInputRef}
+                            style={{ display: 'none' }}
+                            onChange={(e) => {
+                              if (e.target.files) setReviewFiles(Array.from(e.target.files));
+                            }}
+                          />
+                          <button className="btn btn-secondary" onClick={() => reviewFileInputRef.current?.click()} style={{ width: '100%' }}>
+                            Choose Files
+                          </button>
+                          {reviewFiles.length > 0 && (
+                            <ul style={{ margin: '0.5rem 0 0 0', paddingLeft: '1rem', fontSize: '0.8rem' }}>
+                              {reviewFiles.map((f, i) => <li key={i}>{f.name}</li>)}
+                            </ul>
+                          )}
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                          <button className="btn btn-primary" onClick={handleSubmitReview} disabled={loading}>Submit</button>
+                          <button className="btn btn-secondary" onClick={() => { setIsSubmittingReview(false); setReviewFiles([]); }}>Cancel</button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 

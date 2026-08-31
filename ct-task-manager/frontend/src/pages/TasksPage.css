@@ -177,11 +177,27 @@
 
 @media (max-width: 768px) {
   .tasks-page-header {
-    display: none; /* Desktop header hidden on mobile */
+    flex-direction: column;
+    gap: 1rem;
   }
   
+  .tasks-page-title p {
+    font-size: 0.85rem;
+  }
+
   .tasks-filters-bar {
-    display: none; /* Desktop filters hidden on mobile */
+    gap: 0.5rem;
+  }
+  
+  .tasks-search-wrapper {
+    width: 100%;
+    max-width: none;
+    flex: none;
+  }
+
+  .tasks-filter-select {
+    flex: 1 1 calc(50% - 0.5rem);
+    min-width: 0;
   }
   
   .tasks-grid {

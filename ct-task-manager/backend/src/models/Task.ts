@@ -1,6 +1,8 @@
 import mongoose, { Schema, Document } from 'mongoose';
+import Counter from './Counter';
 
 export interface ITask extends Document {
+  taskId: string;
   title: string;
   description: string;
   createdBy: mongoose.Types.ObjectId;
@@ -14,12 +16,19 @@ export interface ITask extends Document {
   currentReviewer: mongoose.Types.ObjectId | null;
   reviewRequestedBy: mongoose.Types.ObjectId | null;
   rejectionReason: string | null;
+  attachments: mongoose.Types.ObjectId[];
+  completionAttachments: mongoose.Types.ObjectId[];
+  requiredCompletionExtensions: string[];
   createdAt: Date;
   updatedAt: Date;
 }
 
 const taskSchema = new Schema<ITask>(
   {
+    taskId: {
+      type: String,
+      unique: true
+    },
     title: {
       type: String,
       required: true,
@@ -89,6 +98,18 @@ const taskSchema = new Schema<ITask>(
       type: String,
       default: null,
     },
+    attachments: [{
+      type: Schema.Types.ObjectId,
+      default: []
+    }],
+    completionAttachments: [{
+      type: Schema.Types.ObjectId,
+      default: []
+    }],
+    requiredCompletionExtensions: [{
+      type: String,
+      default: []
+    }]
   },
   {
     timestamps: true,
@@ -96,6 +117,24 @@ const taskSchema = new Schema<ITask>(
     toObject: { virtuals: true },
   }
 );
+
+taskSchema.pre<ITask>('save', async function(next) {
+  if (this.isNew && !this.taskId) {
+    try {
+      const counter = await Counter.findByIdAndUpdate(
+        { _id: 'taskId' },
+        { $inc: { sequence_value: 1 } },
+        { new: true, upsert: true }
+      );
+      this.taskId = String(counter.sequence_value).padStart(5, '0');
+      next();
+    } catch (error: any) {
+      next(error);
+    }
+  } else {
+    next();
+  }
+});
 
 const Task = mongoose.model<ITask>('Task', taskSchema, 'tasks');
 

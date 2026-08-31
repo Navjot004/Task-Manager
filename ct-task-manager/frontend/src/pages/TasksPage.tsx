@@ -101,15 +101,10 @@ const TasksPage: React.FC = () => {
     }
   }, [page, statusFilter, assigneeFilter, workflowFilter, reviewStageFilter, taskTypeFilter, user, search, isCreatingTask]);
 
-  const handleCreateTaskSubmit = async (taskData: any) => {
+  const handleCreateTaskSubmit = async (taskData: FormData) => {
     setError('');
     try {
-      await api.createTask({
-        title: taskData.title,
-        description: taskData.description,
-        deadline: new Date(taskData.deadline).toISOString(),
-        assignedTo: taskData.assignedTo || null
-      });
+      await api.createTask(taskData);
       setIsCreatingTask(false);
       loadTasks();
     } catch (err: any) {
