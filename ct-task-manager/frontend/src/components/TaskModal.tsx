@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../services/api';
-import { calculateUrgency, getUrgencyBadgeClass } from '../utils/taskUrgency';
+import { calculateUrgency, getUrgencyBadgeClass, getUrgencyColor, getUrgencyLabel } from '../utils/taskUrgency';
 
 interface TaskModalProps {
   task: any | null;
@@ -8,11 +8,11 @@ interface TaskModalProps {
   onRefresh: () => void;
   currentUser: any;
   availableAssignees: any[];
+  onCreateSubtask?: () => void;
 }
 
-const TaskModal: React.FC<TaskModalProps> = ({ task, onClose, onRefresh, currentUser, availableAssignees }) => {
-  if (!task) return null;
-
+const TaskModal: React.FC<TaskModalProps> = ({ task: initialTask, onClose, onRefresh, currentUser, availableAssignees = [], onCreateSubtask }) => {
+  const [task, setTask] = useState<any>(initialTask);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [subtasks, setSubtasks] = useState<any[]>([]);
@@ -36,28 +36,45 @@ const TaskModal: React.FC<TaskModalProps> = ({ task, onClose, onRefresh, current
   // Submit Review mode
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
   const [reviewFiles, setReviewFiles] = useState<File[]>([]);
+  const [fileError, setFileError] = useState('');
   const reviewFileInputRef = React.useRef<HTMLInputElement>(null);
+
+  const refreshTaskData = async () => {
+    try {
+      const res = await api.getTaskById(task._id);
+      if (res.success) {
+        setTask(res.data.task);
+      }
+    } catch (err) {
+      console.error("Failed to refresh task data:", err);
+    }
+    if (onRefresh) {
+      onRefresh();
+    }
+  };
 
   // Reset local state when task changes
   useEffect(() => {
+    setTask(initialTask);
     setIsEditing(false);
     setIsAssigning(false);
     setIsRejecting(false);
     setRejectionReason('');
     setIsSubmittingReview(false);
     setReviewFiles([]);
+    setFileError('');
     setEditData({
-      title: task.title,
-      description: task.description,
-      deadline: new Date(task.deadline).toISOString().slice(0, 16)
+      title: initialTask.title,
+      description: initialTask.description,
+      deadline: new Date(initialTask.deadline).toISOString().slice(0, 16)
     });
-    setAssignTarget(task.assignedTo ? task.assignedTo._id : '');
+    setAssignTarget(initialTask.assignedTo ? initialTask.assignedTo._id : '');
     setError('');
     
-    if (task && !task.isSubtask) {
+    if (initialTask && !initialTask.isSubtask) {
       fetchSubtasks();
     }
-  }, [task]);
+  }, [initialTask]);
 
   const fetchSubtasks = async () => {
     try {
@@ -92,10 +109,9 @@ const TaskModal: React.FC<TaskModalProps> = ({ task, onClose, onRefresh, current
     }
   };
 
-  const canEdit = (currentUser.role === 'super_admin' || 
-    (currentUser.role === 'department_admin' && task.createdBy._id === currentUser.id)) && 
+  const canEdit = (currentUser.role === 'super_admin' || currentUser.role === 'department_admin') && 
     task.status !== 'submitted_for_review' && task.status !== 'approved';
-
+  
   const canAssign = (currentUser.role === 'super_admin' || currentUser.role === 'department_admin') && 
     task.status !== 'submitted_for_review' && task.status !== 'approved';
   
@@ -119,7 +135,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ task, onClose, onRefresh, current
         deadline: editData.deadline
       });
       setIsEditing(false);
-      onRefresh();
+      refreshTaskData();
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -133,7 +149,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ task, onClose, onRefresh, current
       setError('');
       await api.assignTask(task._id, assignTarget || null);
       setIsAssigning(false);
-      onRefresh();
+      refreshTaskData();
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -146,9 +162,10 @@ const TaskModal: React.FC<TaskModalProps> = ({ task, onClose, onRefresh, current
       setLoading(true);
       setError('');
       await api.updateTaskStatus(task._id, status);
-      onRefresh();
+      refreshTaskData();
     } catch (err: any) {
       setError(err.message);
+      alert(`Error: ${err.message}`);
     } finally {
       setLoading(false);
     }
@@ -158,6 +175,28 @@ const TaskModal: React.FC<TaskModalProps> = ({ task, onClose, onRefresh, current
     try {
       setLoading(true);
       setError('');
+
+      if (task.requiredCompletionExtensions && task.requiredCompletionExtensions.length > 0) {
+        if (reviewFiles.length === 0) {
+          setFileError(`Please upload required documents. Formats allowed: ${task.requiredCompletionExtensions.join(', ')}`);
+          setLoading(false);
+          return;
+        }
+
+        const invalidFiles = reviewFiles.filter(f => {
+          const parts = f.name.split('.');
+          if (parts.length < 2) return true;
+          const ext = '.' + parts.pop()?.toLowerCase();
+          return !task.requiredCompletionExtensions.includes(ext);
+        });
+
+        if (invalidFiles.length > 0) {
+          setFileError(`Invalid file format: ${invalidFiles.map(f=>f.name).join(', ')}. Allowed: ${task.requiredCompletionExtensions.join(', ')}`);
+          setLoading(false);
+          return;
+        }
+      }
+
       let formData: FormData | undefined = undefined;
       if (reviewFiles.length > 0) {
         formData = new FormData();
@@ -166,9 +205,10 @@ const TaskModal: React.FC<TaskModalProps> = ({ task, onClose, onRefresh, current
       await api.submitTaskForReview(task._id, formData);
       setIsSubmittingReview(false);
       setReviewFiles([]);
-      onRefresh();
+      refreshTaskData();
     } catch (err: any) {
       setError(err.message);
+      alert(`Error: ${err.message}`);
     } finally {
       setLoading(false);
     }
@@ -185,9 +225,10 @@ const TaskModal: React.FC<TaskModalProps> = ({ task, onClose, onRefresh, current
       }
       await api.reviewTask(task._id, decision, decision === 'rejected' ? rejectionReason : undefined);
       setIsRejecting(false);
-      onRefresh();
+      refreshTaskData();
     } catch (err: any) {
       setError(err.message);
+      alert(`Error: ${err.message}`);
     } finally {
       setLoading(false);
     }
@@ -220,12 +261,45 @@ const TaskModal: React.FC<TaskModalProps> = ({ task, onClose, onRefresh, current
         {!isEditing ? (
           <>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
-              <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 700, color: '#0f172a', paddingRight: '2rem' }}>
-                <span style={{ color: '#64748b', marginRight: '0.5rem' }}>#{task.taskId}</span>
-                {task.title}
-                {task.isSubtask && <span style={{ fontSize: '0.7rem', backgroundColor: '#e2e8f0', color: '#475569', padding: '0.2rem 0.6rem', borderRadius: '4px', marginLeft: '0.5rem', verticalAlign: 'middle' }}>SUBTASK</span>}
+              <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 700, color: '#0f172a', paddingRight: '2rem', flex: 1, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+                <div>
+                  <span style={{ color: '#64748b', marginRight: '0.5rem' }}>#{task.taskId}</span>
+                  {task.title}
+                </div>
+                <span style={{ 
+                  background: getUrgencyColor(urgency) + '20', 
+                  color: getUrgencyColor(urgency), 
+                  border: `1px solid ${getUrgencyColor(urgency)}40`, 
+                  padding: '0.15rem 0.5rem', 
+                  borderRadius: '4px', 
+                  fontSize: '0.7rem',
+                  textTransform: 'uppercase',
+                  fontWeight: 600,
+                  whiteSpace: 'nowrap'
+                }}>
+                  {getUrgencyLabel(urgency)}
+                </span>
+                {task.isSubtask && <span style={{ fontSize: '0.7rem', backgroundColor: '#e2e8f0', color: '#475569', padding: '0.2rem 0.6rem', borderRadius: '4px', verticalAlign: 'middle' }}>SUBTASK</span>}
               </h2>
-              <span className={`badge ${badgeClass}`} style={{ flexShrink: 0 }}>{urgency}</span>
+              <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                {!task.isSubtask && onCreateSubtask && task.status !== 'completed' && task.status !== 'approved' && (
+                  <button 
+                    onClick={onCreateSubtask}
+                    style={{
+                      padding: '0.4rem 0.8rem',
+                      backgroundColor: 'transparent',
+                      color: '#3b82f6',
+                      border: '1px dashed #bfdbfe',
+                      borderRadius: '6px',
+                      fontSize: '0.8rem',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    + Add Subtask
+                  </button>
+                )}
+              </div>
             </div>
 
             {task.isSubtask && task.parentTaskId && (
@@ -318,7 +392,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ task, onClose, onRefresh, current
                   <div style={{ display: 'flex', gap: '0.5rem' }}>
                     {task.status === 'pending' && <button className="btn btn-primary" onClick={() => handleStatusChange('in_progress')} disabled={loading}>Start Task</button>}
                     {task.status === 'rejected' && <button className="btn btn-primary" onClick={() => handleStatusChange('in_progress')} disabled={loading}>Start Again</button>}
-                    {task.status === 'in_progress' && <button className="btn btn-success" onClick={() => handleStatusChange('completed')} disabled={loading} style={{ backgroundColor: '#10b981', color: 'white' }}>Mark Completed</button>}
+                    {task.status === 'in_progress' && !isSubmittingReview && <button className="btn btn-success" onClick={() => setIsSubmittingReview(true)} disabled={loading} style={{ backgroundColor: '#10b981', color: 'white' }}>Submit Task</button>}
                     {task.status === 'completed' && !isSubmittingReview && <button className="btn btn-success" onClick={() => setIsSubmittingReview(true)} disabled={loading} style={{ backgroundColor: '#3b82f6', color: 'white' }}>Submit for Review</button>}
                     {task.status === 'submitted_for_review' && <span style={{ color: '#d97706', fontWeight: 'bold' }}>Waiting for Review</span>}
                     {task.status === 'approved' && <span style={{ color: '#059669', fontWeight: 'bold' }}>Approved</span>}
@@ -338,13 +412,54 @@ const TaskModal: React.FC<TaskModalProps> = ({ task, onClose, onRefresh, current
                             multiple 
                             ref={reviewFileInputRef}
                             style={{ display: 'none' }}
+                            accept={task.requiredCompletionExtensions?.length ? task.requiredCompletionExtensions.join(',') : undefined}
                             onChange={(e) => {
-                              if (e.target.files) setReviewFiles(Array.from(e.target.files));
+                              if (e.target.files) {
+                                const selected = Array.from(e.target.files);
+                                if (task.requiredCompletionExtensions?.length) {
+                                  const invalid = selected.filter(f => {
+                                    const parts = f.name.split('.');
+                                    if (parts.length < 2) return true;
+                                    const ext = '.' + parts.pop()?.toLowerCase();
+                                    return !task.requiredCompletionExtensions.includes(ext);
+                                  });
+                                  if (invalid.length > 0) {
+                                    setFileError(`Invalid file format: ${invalid.map(f=>f.name).join(', ')}. Allowed: ${task.requiredCompletionExtensions.join(', ')}`);
+                                    if (reviewFileInputRef.current) reviewFileInputRef.current.value = '';
+                                    return;
+                                  }
+                                }
+                                setFileError('');
+                                setReviewFiles(selected);
+                              }
                             }}
                           />
                           <button className="btn btn-secondary" onClick={() => reviewFileInputRef.current?.click()} style={{ width: '100%' }}>
                             Choose Files
                           </button>
+                          
+                          {/* File Error Popup */}
+                          {fileError && (
+                            <div style={{
+                              marginTop: '0.75rem',
+                              padding: '0.5rem 0.75rem',
+                              backgroundColor: '#fee2e2',
+                              border: '1px solid #fca5a5',
+                              borderRadius: '6px',
+                              color: '#991b1b',
+                              fontSize: '0.8rem',
+                              position: 'relative',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between'
+                            }}>
+                              <span>{fileError}</span>
+                              <button 
+                                onClick={() => setFileError('')} 
+                                style={{ background: 'transparent', border: 'none', color: '#991b1b', cursor: 'pointer', fontSize: '1rem', padding: '0 0.25rem' }}
+                              >&times;</button>
+                            </div>
+                          )}
                           {reviewFiles.length > 0 && (
                             <ul style={{ margin: '0.5rem 0 0 0', paddingLeft: '1rem', fontSize: '0.8rem' }}>
                               {reviewFiles.map((f, i) => <li key={i}>{f.name}</li>)}

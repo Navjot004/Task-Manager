@@ -32,6 +32,7 @@ const TasksPage: React.FC = () => {
   // Modals & Views
   const [selectedTask, setSelectedTask] = useState<any | null>(null);
   const [isCreatingTask, setIsCreatingTask] = useState(false);
+  const [creatingSubtaskFor, setCreatingSubtaskFor] = useState<string | null>(null);
   
   const loadTasks = async () => {
     try {
@@ -101,24 +102,39 @@ const TasksPage: React.FC = () => {
     }
   }, [page, statusFilter, assigneeFilter, workflowFilter, reviewStageFilter, taskTypeFilter, user, search, isCreatingTask]);
 
-  const handleCreateTaskSubmit = async (taskData: FormData) => {
+  const handleCreateTaskSubmit = async (taskData: FormData | FormData[]) => {
     setError('');
     try {
-      await api.createTask(taskData);
-      setIsCreatingTask(false);
+      if (Array.isArray(taskData)) {
+        await Promise.all(taskData.map(data => api.createTask(data)));
+      } else {
+        await api.createTask(taskData);
+      }
       loadTasks();
+      setIsCreatingTask(false);
+      setCreatingSubtaskFor(null);
     } catch (err: any) {
       setError(err.message);
       throw err; // rethrow for the CreateTaskView to catch and stop loading
     }
   };
 
+  const handleCreateSubtaskForTask = (taskId: string) => {
+    setCreatingSubtaskFor(taskId);
+    setIsCreatingTask(true);
+    setSelectedTask(null);
+  };
+
   if (isCreatingTask) {
     return (
       <CreateTaskView 
         onSubmit={handleCreateTaskSubmit}
-        onCancel={() => setIsCreatingTask(false)}
+        onCancel={() => {
+          setIsCreatingTask(false);
+          setCreatingSubtaskFor(null);
+        }}
         availableAssignees={availableAssignees}
+        preselectedParentTask={creatingSubtaskFor}
       />
     );
   }
@@ -231,6 +247,7 @@ const TasksPage: React.FC = () => {
                   key={task._id} 
                   task={task} 
                   onClick={() => setSelectedTask(task)} 
+                  onCreateSubtask={() => handleCreateSubtaskForTask(task._id)}
                 />
               ))}
             </div>
@@ -271,6 +288,7 @@ const TasksPage: React.FC = () => {
             loadPendingCount();
             api.getTaskById(selectedTask._id).then(res => setSelectedTask(res.data.task)).catch(() => setSelectedTask(null));
           }}
+          onCreateSubtask={() => handleCreateSubtaskForTask(selectedTask._id)}
         />
       )}
     </>

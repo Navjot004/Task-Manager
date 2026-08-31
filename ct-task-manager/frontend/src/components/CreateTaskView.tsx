@@ -1,37 +1,62 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { History, Clock, UploadCloud, Plus, ArrowRight, ChevronDown, ArrowLeft, X } from 'lucide-react';
-import api from '../services/api';
+import { History, Clock, UploadCloud, Plus, ArrowRight, ChevronDown, ArrowLeft, X, Search } from 'lucide-react';
+import { api } from '../services/api';
 import './CreateTaskView.css';
 
 interface CreateTaskViewProps {
   onSubmit: (taskData: any) => Promise<void>;
   onCancel: () => void;
   availableAssignees: any[];
+  preselectedParentTask?: string | null;
 }
 
-const CreateTaskView: React.FC<CreateTaskViewProps> = ({ onSubmit, onCancel, availableAssignees }) => {
+const CreateTaskView: React.FC<CreateTaskViewProps> = ({ onSubmit, onCancel, availableAssignees, preselectedParentTask }) => {
   const [loading, setLoading] = useState(false);
-  const [files, setFiles] = useState<File[]>([]);
-  const [requiredExtensions, setRequiredExtensions] = useState<string[]>([]);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isSubtaskMode, setIsSubtaskMode] = useState(!!preselectedParentTask);
+  const [parentTaskId, setParentTaskId] = useState(preselectedParentTask || '');
+  
+  const [tasksToCreate, setTasksToCreate] = useState([
+    {
+      title: '',
+      description: '',
+      deadline: '',
+      assignedTo: '',
+      files: [] as File[],
+      requiredExtensions: [] as string[]
+    }
+  ]);
+  const [activeTab, setActiveTab] = useState(0);
 
   const availableExtensions = ['.pdf', '.docx', '.xlsx', '.pptx', '.csv', '.jpg', '.png', '.zip'];
   
   const toggleExtension = (ext: string) => {
-    setRequiredExtensions(prev => 
-      prev.includes(ext) ? prev.filter(e => e !== ext) : [...prev, ext]
-    );
+    setTasksToCreate(prev => {
+      const newTasks = [...prev];
+      const task = { ...newTasks[activeTab] };
+      task.requiredExtensions = task.requiredExtensions.includes(ext) 
+        ? task.requiredExtensions.filter(e => e !== ext)
+        : [...task.requiredExtensions, ext];
+      newTasks[activeTab] = task;
+      return newTasks;
+    });
   };
-  const [taskData, setTaskData] = useState({
-    title: '',
-    description: '',
-    deadline: '',
-    assignedTo: '',
-    isSubtask: false,
-    parentTaskId: ''
-  });
 
   const [mainTasks, setMainTasks] = useState<any[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   useEffect(() => {
     const fetchMainTasks = async () => {
@@ -49,29 +74,38 @@ const CreateTaskView: React.FC<CreateTaskViewProps> = ({ onSubmit, onCancel, ava
     e.preventDefault();
     setLoading(true);
     try {
-      const formData = new FormData();
-      formData.append('title', taskData.title);
-      formData.append('description', taskData.description);
-      formData.append('deadline', taskData.deadline);
-      formData.append('isSubtask', String(taskData.isSubtask));
-      if (taskData.isSubtask && taskData.parentTaskId) {
-        formData.append('parentTaskId', taskData.parentTaskId);
-      }
-      if (taskData.assignedTo) {
-        formData.append('assignedTo', taskData.assignedTo);
-      }
-      
-      files.forEach(file => {
-        formData.append('attachments', file);
+      const forms = tasksToCreate.map(task => {
+        const formData = new FormData();
+        formData.append('title', task.title);
+        formData.append('description', task.description);
+        formData.append('deadline', task.deadline);
+        formData.append('isSubtask', String(isSubtaskMode));
+        if (isSubtaskMode && parentTaskId) {
+          formData.append('parentTaskId', parentTaskId);
+        }
+        if (task.assignedTo) {
+          formData.append('assignedTo', task.assignedTo);
+        }
+        task.files.forEach(file => {
+          formData.append('attachments', file);
+        });
+        formData.append('requiredCompletionExtensions', JSON.stringify(task.requiredExtensions));
+        return formData;
       });
-      
-      formData.append('requiredCompletionExtensions', JSON.stringify(requiredExtensions));
 
-      await onSubmit(formData);
+      await onSubmit(isSubtaskMode ? forms : forms[0]);
     } finally {
       setLoading(false);
     }
   };
+
+  const filteredMainTasks = mainTasks.filter(mt => {
+    const q = searchQuery.toLowerCase();
+    return (mt.taskId && mt.taskId.toLowerCase().includes(q)) || 
+           (mt.title && mt.title.toLowerCase().includes(q));
+  });
+
+  const selectedTask = mainTasks.find(mt => mt._id === parentTaskId);
 
   return (
     <div className="create-task-view">
@@ -97,37 +131,123 @@ const CreateTaskView: React.FC<CreateTaskViewProps> = ({ onSubmit, onCancel, ava
           <div className="ct-classification">
             <button 
               type="button"
-              className={`ct-class-btn ${!taskData.isSubtask ? 'active' : ''}`}
-              onClick={() => setTaskData({...taskData, isSubtask: false})}
+              className={`ct-class-btn ${!isSubtaskMode ? 'active' : ''}`}
+              onClick={() => setIsSubtaskMode(false)}
             >
               Main Task
             </button>
             <button 
               type="button"
-              className={`ct-class-btn ${taskData.isSubtask ? 'active' : ''}`}
-              onClick={() => setTaskData({...taskData, isSubtask: true})}
+              className={`ct-class-btn ${isSubtaskMode ? 'active' : ''}`}
+              onClick={() => setIsSubtaskMode(true)}
             >
               Subtask
             </button>
           </div>
 
-          {taskData.isSubtask && (
-            <div className="ct-input-group">
-              <label className="ct-label">SELECT PARENT TASK</label>
-              <div className="ct-select-wrapper">
-                <select 
-                  className="ct-select"
-                  value={taskData.parentTaskId}
-                  onChange={(e) => setTaskData({...taskData, parentTaskId: e.target.value})}
-                  required={taskData.isSubtask}
+          {isSubtaskMode && (
+            <div className="ct-subtask-tabs-container">
+              <div className="ct-subtask-tabs">
+                {tasksToCreate.map((task, idx) => (
+                  <div 
+                    key={idx} 
+                    className={`ct-subtask-tab ${activeTab === idx ? 'active' : ''}`}
+                    onClick={() => setActiveTab(idx)}
+                  >
+                    <span>
+                      {task.title || `Subtask ${idx + 1}`}
+                    </span>
+                    {tasksToCreate.length > 1 && (
+                      <button 
+                        type="button"
+                        className="ct-tab-close"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const n = tasksToCreate.filter((_, i) => i !== idx);
+                          setTasksToCreate(n);
+                          if (activeTab >= n.length) setActiveTab(n.length - 1);
+                        }}
+                      >
+                        <X size={12} />
+                      </button>
+                    )}
+                  </div>
+                ))}
+                <button 
+                  type="button" 
+                  className="ct-add-tab-btn"
+                  onClick={() => {
+                    setTasksToCreate([...tasksToCreate, {
+                      title: '', description: '', deadline: '', assignedTo: '', files: [], requiredExtensions: []
+                    }]);
+                    setActiveTab(tasksToCreate.length);
+                  }}
+                  title="Add another subtask"
                 >
-                  <option value="">Select a main task...</option>
-                  {mainTasks.map(mt => (
-                    <option key={mt._id} value={mt._id}>#{mt.taskId} - {mt.title}</option>
-                  ))}
-                </select>
-                <ChevronDown className="ct-select-icon" size={16} />
+                  <Plus size={16} />
+                </button>
               </div>
+            </div>
+          )}
+
+          {isSubtaskMode && (
+            <div className="ct-input-group" ref={dropdownRef}>
+              <label className="ct-label">SELECT PARENT TASK</label>
+              <div className="ct-custom-select-wrapper">
+                <div 
+                  className={`ct-custom-select ${isDropdownOpen ? 'open' : ''}`}
+                  onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                >
+                  {selectedTask ? `#${selectedTask.taskId} - ${selectedTask.title}` : <span className="placeholder">Select a main task...</span>}
+                  <ChevronDown className="ct-select-icon" size={16} />
+                </div>
+                
+                {isDropdownOpen && (
+                  <div className="ct-dropdown-menu">
+                    <div className="ct-dropdown-search">
+                      <Search size={14} className="ct-search-icon" />
+                      <input 
+                        type="text" 
+                        placeholder="Search ID or Title..." 
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        onClick={(e) => e.stopPropagation()}
+                        autoFocus
+                      />
+                    </div>
+                    <ul className="ct-dropdown-list">
+                      <li 
+                        className={`ct-dropdown-item ${!parentTaskId ? 'selected' : ''}`}
+                        onClick={() => {
+                          setParentTaskId('');
+                          setIsDropdownOpen(false);
+                        }}
+                      >
+                        None
+                      </li>
+                      {filteredMainTasks.length === 0 && (
+                        <li className="ct-dropdown-item empty">No tasks found</li>
+                      )}
+                      {filteredMainTasks.map(mt => (
+                        <li 
+                          key={mt._id}
+                          className={`ct-dropdown-item ${parentTaskId === mt._id ? 'selected' : ''}`}
+                          onClick={() => {
+                            setParentTaskId(mt._id);
+                            setIsDropdownOpen(false);
+                            setSearchQuery('');
+                          }}
+                        >
+                          <span className="ct-dropdown-task-id">#{mt.taskId}</span>
+                          <span className="ct-dropdown-task-title">{mt.title}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+              {/* Hidden input for HTML5 validation if needed */}
+              <input type="hidden" required={isSubtaskMode} value={parentTaskId} />
             </div>
           )}
 
@@ -138,8 +258,8 @@ const CreateTaskView: React.FC<CreateTaskViewProps> = ({ onSubmit, onCancel, ava
               className="ct-title-input" 
               placeholder="e.g., Finalize Q3 Departmental Budget" 
               required
-              value={taskData.title}
-              onChange={e => setTaskData({...taskData, title: e.target.value})}
+              value={tasksToCreate[activeTab].title}
+              onChange={e => setTasksToCreate(prev => { const n = [...prev]; const t = {...n[activeTab]}; t.title = e.target.value; n[activeTab] = t; return n; })}
             />
           </div>
 
@@ -149,8 +269,8 @@ const CreateTaskView: React.FC<CreateTaskViewProps> = ({ onSubmit, onCancel, ava
               className="ct-desc-input" 
               placeholder="Detailed requirements and context for the assignee..."
               required
-              value={taskData.description}
-              onChange={e => setTaskData({...taskData, description: e.target.value})}
+              value={tasksToCreate[activeTab].description}
+              onChange={e => setTasksToCreate(prev => { const n = [...prev]; const t = {...n[activeTab]}; t.description = e.target.value; n[activeTab] = t; return n; })}
             />
           </div>
 
@@ -160,8 +280,8 @@ const CreateTaskView: React.FC<CreateTaskViewProps> = ({ onSubmit, onCancel, ava
               <div className="ct-select-container">
                 <select 
                   className="ct-select"
-                  value={taskData.assignedTo}
-                  onChange={e => setTaskData({...taskData, assignedTo: e.target.value})}
+                  value={tasksToCreate[activeTab].assignedTo}
+                  onChange={e => setTasksToCreate(prev => { const n = [...prev]; const t = {...n[activeTab]}; t.assignedTo = e.target.value; n[activeTab] = t; return n; })}
                 >
                   <option value="">Unassigned (Open Pool)</option>
                   {availableAssignees.map(a => (
@@ -178,8 +298,8 @@ const CreateTaskView: React.FC<CreateTaskViewProps> = ({ onSubmit, onCancel, ava
                 type="date" 
                 className="ct-date" 
                 required
-                value={taskData.deadline}
-                onChange={e => setTaskData({...taskData, deadline: e.target.value})}
+                value={tasksToCreate[activeTab].deadline}
+                onChange={e => setTasksToCreate(prev => { const n = [...prev]; const t = {...n[activeTab]}; t.deadline = e.target.value; n[activeTab] = t; return n; })}
               />
             </div>
           </div>
@@ -214,17 +334,32 @@ const CreateTaskView: React.FC<CreateTaskViewProps> = ({ onSubmit, onCancel, ava
               ref={fileInputRef}
               onChange={(e) => {
                 if (e.target.files) {
-                  setFiles(Array.from(e.target.files));
+                  setTasksToCreate(prev => {
+                    const n = [...prev];
+                    const task = { ...n[activeTab] };
+                    task.files = Array.from(e.target.files!);
+                    n[activeTab] = task;
+                    return n;
+                  });
                 }
               }}
             />
           </div>
-          {files.length > 0 && (
+          {tasksToCreate[activeTab].files.length > 0 && (
             <div className="ct-files-list">
-              {files.map((file, i) => (
+              {tasksToCreate[activeTab].files.map((file, i) => (
                 <div key={i} className="ct-file-item">
                   <span className="ct-file-name">{file.name}</span>
-                  <button type="button" onClick={(e) => { e.stopPropagation(); setFiles(f => f.filter((_, idx) => idx !== i)); }}>
+                  <button type="button" onClick={(e) => { 
+                    e.stopPropagation(); 
+                    setTasksToCreate(prev => {
+                      const n = [...prev];
+                      const task = { ...n[activeTab] };
+                      task.files = task.files.filter((_, idx) => idx !== i);
+                      n[activeTab] = task;
+                      return n;
+                    });
+                  }}>
                     <X size={14} />
                   </button>
                 </div>
@@ -238,7 +373,7 @@ const CreateTaskView: React.FC<CreateTaskViewProps> = ({ onSubmit, onCancel, ava
               <button
                 key={ext}
                 type="button"
-                className={`ct-ext-btn ${requiredExtensions.includes(ext) ? 'active' : ''}`}
+                className={`ct-ext-btn ${tasksToCreate[activeTab].requiredExtensions.includes(ext) ? 'active' : ''}`}
                 onClick={() => toggleExtension(ext)}
               >
                 {ext}
@@ -254,7 +389,7 @@ const CreateTaskView: React.FC<CreateTaskViewProps> = ({ onSubmit, onCancel, ava
             Cancel
           </button>
           <button type="submit" className="ct-btn-submit" disabled={loading}>
-            Create Task <ArrowRight size={16} />
+            Create Task{tasksToCreate.length > 1 ? 's' : ''} <ArrowRight size={16} />
           </button>
         </div>
 

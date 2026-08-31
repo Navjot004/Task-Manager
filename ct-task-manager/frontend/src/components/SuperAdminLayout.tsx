@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { api } from '../services/api';
 import { 
   Building2, 
   LayoutDashboard, 
@@ -22,6 +23,30 @@ const SuperAdminLayout: React.FC = () => {
   const { logout, currentUser } = useAuth();
   const navigate = useNavigate();
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const [hasNotifications, setHasNotifications] = useState(false);
+
+  useEffect(() => {
+    const checkNotifications = async () => {
+      try {
+        // Simple logic for Super Admin: show dot if there are tasks awaiting review
+        const res = await api.getTasks({ limit: 1, status: 'submitted_for_review' });
+        if (res.data && res.data.pagination.total > 0) {
+          setHasNotifications(true);
+        } else {
+          setHasNotifications(false);
+        }
+      } catch (error) {
+        console.error("Error fetching notifications", error);
+      }
+    };
+
+    if (currentUser?.role === 'super_admin') {
+      checkNotifications();
+      // Optional: Poll every 60 seconds
+      const intervalId = setInterval(checkNotifications, 60000);
+      return () => clearInterval(intervalId);
+    }
+  }, [currentUser]);
 
   const handleLogout = () => {
     logout();
@@ -100,9 +125,9 @@ const SuperAdminLayout: React.FC = () => {
             </div>
           </div>
           <div className="sa-topbar-right">
-            <button className="sa-notification-btn">
+            <button className="sa-notification-btn" onClick={() => navigate('/super-admin/tasks')}>
               <Bell size={20} />
-              <span className="sa-notification-badge"></span>
+              {hasNotifications && <span className="sa-notification-badge"></span>}
             </button>
             <div className="sa-user-profile">
               <div className="sa-user-info">

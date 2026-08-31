@@ -18,11 +18,17 @@ import {
   ArrowUp
 } from 'lucide-react';
 import { api } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 import { calculateUrgency, getUrgencyCardStyle, getUrgencyLabel, getUrgencyColor } from '../utils/taskUrgency';
+import TaskModal from '../components/TaskModal';
 import './SuperAdminDashboard.css';
 
 const SuperAdminPage = () => {
   const navigate = useNavigate();
+  const { currentUser } = useAuth();
+
+  const [selectedTask, setSelectedTask] = useState<any | null>(null);
+  const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
 
   const [userStats, setUserStats] = useState({
     totalUsers: 0,
@@ -69,7 +75,7 @@ const SuperAdminPage = () => {
         });
 
         // Fetch Tasks Awaiting Review
-        const reviewRes = await api.getTasks({ limit: 5, status: 'submitted_for_review', reviewStage: 'super_admin' });
+        const reviewRes = await api.getTasks({ limit: 5, status: 'submitted_for_review' });
         setTasksAwaitingReview(reviewRes.data.tasks);
 
         // Fetch Recent Activity (Latest tasks)
@@ -85,6 +91,11 @@ const SuperAdminPage = () => {
 
     fetchDashboardData();
   }, []);
+
+  const handleTaskClick = (task: any) => {
+    setSelectedTask(task);
+    setIsTaskModalOpen(true);
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -189,13 +200,15 @@ const SuperAdminPage = () => {
                 const urgencyColor = getUrgencyColor(urgency);
                 
                 return (
-                <div key={task._id} className="sa-review-item" style={{ backgroundColor: cardStyle.backgroundColor, borderLeft: cardStyle.borderLeft }}>
+                <div 
+                  key={task._id} 
+                  className="sa-review-item" 
+                  style={{ backgroundColor: cardStyle.backgroundColor, borderLeft: cardStyle.borderLeft, cursor: 'pointer' }}
+                  onClick={() => handleTaskClick(task)}
+                >
                   <div className="sa-review-info">
                     <div className="sa-review-item-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                       {task.title}
-                      <span className="sa-badge" style={{ background: urgencyColor + '20', color: urgencyColor, border: `1px solid ${urgencyColor}40`, padding: '0.15rem 0.5rem', borderRadius: '4px', fontSize: '0.7rem' }}>
-                        {urgencyLabel}
-                      </span>
                     </div>
                     <div className="sa-review-meta">
                       <span><UsersIcon size={14} /> Assignee: {task.assignedTo?.name || 'Unassigned'}</span>
@@ -263,47 +276,53 @@ const SuperAdminPage = () => {
             </div>
           </div>
 
-          <table className="sa-activity-table">
-            <thead>
-              <tr>
-                <th>Task Name</th>
-                <th>Assignee</th>
-                <th>Status</th>
-                <th>Deadline</th>
-              </tr>
-            </thead>
-            <tbody>
-              {recentTasks.length > 0 ? (
-                recentTasks.map(task => {
-                  const urgency = calculateUrgency(task.deadline);
-                  const cardStyle = getUrgencyCardStyle(urgency);
-                  
-                  return (
-                  <tr key={task._id} style={{ backgroundColor: cardStyle.backgroundColor }}>
-                    <td className="sa-task-name-cell" style={{ borderLeft: cardStyle.borderLeft, paddingLeft: '1rem' }}>
-                      <div className={`sa-status-indicator ${getStatusColor(task.status)}`}></div>
-                      <span className="sa-task-name-text">{task.title}</span>
-                    </td>
-                    <td>
-                      <div className="sa-assignee-cell">
-                        <div className="sa-assignee-avatar">
-                          {task.assignedTo?.name ? task.assignedTo.name.charAt(0) : '?'}
-                        </div>
-                        <span className="sa-assignee-id">{task.assignedTo?.name || 'Unassigned'}</span>
-                      </div>
-                    </td>
-                    <td><span className={`sa-status-badge ${getStatusBadgeClass(task.status)}`}>{task.status.replace(/_/g, ' ')}</span></td>
-                    <td className="sa-date-text">{formatDate(task.deadline)}</td>
-                  </tr>
-                  );
-                })
-              ) : (
+          <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+            <table className="sa-activity-table">
+              <thead>
                 <tr>
-                  <td colSpan={4} style={{ textAlign: 'center', color: '#64748b' }}>No recent tasks found.</td>
+                  <th>Task Name</th>
+                  <th>Assignee</th>
+                  <th>Status</th>
+                  <th>Deadline</th>
                 </tr>
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {recentTasks.length > 0 ? (
+                  recentTasks.map(task => {
+                    const urgency = calculateUrgency(task.deadline);
+                    const cardStyle = getUrgencyCardStyle(urgency);
+                    
+                    return (
+                    <tr 
+                      key={task._id} 
+                      style={{ backgroundColor: cardStyle.backgroundColor, cursor: 'pointer' }}
+                      onClick={() => handleTaskClick(task)}
+                    >
+                      <td className="sa-task-name-cell" style={{ borderLeft: cardStyle.borderLeft, paddingLeft: '1rem' }}>
+                        <div className={`sa-status-indicator ${getStatusColor(task.status)}`}></div>
+                        <span className="sa-task-name-text">{task.title}</span>
+                      </td>
+                      <td>
+                        <div className="sa-assignee-cell">
+                          <div className="sa-assignee-avatar">
+                            {task.assignedTo?.name ? task.assignedTo.name.charAt(0) : '?'}
+                          </div>
+                          <span className="sa-assignee-id">{task.assignedTo?.name || 'Unassigned'}</span>
+                        </div>
+                      </td>
+                      <td><span className={`sa-status-badge ${getStatusBadgeClass(task.status)}`}>{task.status.replace(/_/g, ' ')}</span></td>
+                      <td className="sa-date-text">{formatDate(task.deadline)}</td>
+                    </tr>
+                    );
+                  })
+                ) : (
+                  <tr>
+                    <td colSpan={4} style={{ textAlign: 'center', color: '#64748b' }}>No recent tasks found.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
 
           {recentTasks.length > 0 && (
             <button className="sa-load-more" onClick={() => navigate('/super-admin/tasks')}>
@@ -313,6 +332,26 @@ const SuperAdminPage = () => {
         </div>
 
       </div>
+
+      {/* Task Modal */}
+      {isTaskModalOpen && selectedTask && (
+        <TaskModal
+          task={selectedTask}
+          onClose={() => {
+            setIsTaskModalOpen(false);
+            setSelectedTask(null);
+          }}
+          onRefresh={() => {
+            // Re-fetch data on refresh
+            api.getTasks({ limit: 5, status: 'submitted_for_review' }).then(res => setTasksAwaitingReview(res.data.tasks));
+            api.getTasks({ limit: 5 }).then(res => setRecentTasks(res.data.tasks));
+            api.getTasks({ limit: 1, status: 'pending' }).then(res => setTaskMetrics(prev => ({ ...prev, pending: res.data.pagination.total })));
+            api.getTasks({ limit: 1, status: 'completed' }).then(res => setTaskMetrics(prev => ({ ...prev, completed: res.data.pagination.total })));
+          }}
+          currentUser={currentUser}
+          availableAssignees={[]} // Assignees aren't edited directly from dashboard usually
+        />
+      )}
     </div>
   );
 };

@@ -7,9 +7,10 @@ import './TaskCard.css';
 interface TaskCardProps {
   task: any;
   onClick: (task: any) => void;
+  onCreateSubtask?: () => void;
 }
 
-const TaskCard: React.FC<TaskCardProps> = ({ task, onClick }) => {
+const TaskCard: React.FC<TaskCardProps> = ({ task, onClick, onCreateSubtask }) => {
   const [progress, setProgress] = useState<any>(null);
 
   useEffect(() => {
@@ -121,6 +122,21 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onClick }) => {
           <div className="tc-progress-bar">
             <div className="tc-progress-fill" style={{ width: `${progress.percentage}%` }}></div>
           </div>
+        </div>
+      )}
+
+      {/* Add Subtask Button for Main Tasks */}
+      {!task.isSubtask && onCreateSubtask && !isCompleted && (
+        <div style={{ marginBottom: '1rem' }}>
+          <button 
+            className="tc-add-subtask-btn" 
+            onClick={(e) => {
+              e.stopPropagation(); // prevent opening the card
+              onCreateSubtask();
+            }}
+          >
+            + Add Subtask
+          </button>
         </div>
       )}
 

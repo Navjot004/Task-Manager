@@ -471,8 +471,8 @@ export const submitReview = async (req: Request, res: Response) => {
       return res.status(403).json({ success: false, message: 'Forbidden. Only the assignee can submit a task for review.' });
     }
 
-    if (task.status !== 'completed') {
-      return res.status(400).json({ success: false, message: 'Task must be completed before submission.' });
+    if (task.status !== 'completed' && task.status !== 'in_progress') {
+      return res.status(400).json({ success: false, message: 'Task must be in progress or completed before submission.' });
     }
 
     // Validate required extensions if any
@@ -533,7 +533,8 @@ export const submitReview = async (req: Request, res: Response) => {
       task.reviewStage = 'super_admin';
       task.currentReviewer = task.createdBy; 
     } else if (task.workflowType === 'department_admin') {
-      task.reviewStage = 'department_admin';
+      const creator = await User.findById(task.createdBy);
+      task.reviewStage = (creator && creator.role === 'super_admin') ? 'super_admin' : 'department_admin';
       task.currentReviewer = task.createdBy;
     } else {
       // Fallback
