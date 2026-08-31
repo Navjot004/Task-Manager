@@ -29,20 +29,9 @@ const DeptAdminStaffPage: React.FC = () => {
       const assignments = assignmentsRes.data.assignments || [];
       setRoster(assignments.map((a: any) => a.staffId).filter(Boolean));
 
-      // 2. Fetch all users to populate directory (filter out super admins and current user)
-      const usersRes = await api.getUsers({ role: 'staff', limit: 50 });
-      console.log('usersRes:', usersRes);
-      let allStaff = usersRes.data?.users || [];
-      
-      // Filter out those already in roster
-      const rosterIds = new Set(assignments.map((a: any) => {
-        const sid = a.staffId;
-        return sid?._id?.toString() || sid?.id?.toString() || '';
-      }).filter(Boolean));
-      const availableStaff = allStaff.filter((s: any) => {
-        const sId = (s.id || s._id || '').toString();
-        return !rosterIds.has(sId);
-      });
+      // 2. Fetch all unassigned staff users to populate directory (filter out those already in any team)
+      const usersRes = await api.getUsers({ role: 'staff', limit: 50, unassignedOnly: true });
+      let availableStaff = usersRes.data?.users || [];
       
       setDirectory(availableStaff);
 

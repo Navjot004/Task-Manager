@@ -6,11 +6,12 @@ import './TaskCard.css';
 
 interface TaskCardProps {
   task: any;
+  currentUser: any;
   onClick: (task: any) => void;
   onCreateSubtask?: () => void;
 }
 
-const TaskCard: React.FC<TaskCardProps> = ({ task, onClick, onCreateSubtask }) => {
+const TaskCard: React.FC<TaskCardProps> = ({ task, currentUser, onClick, onCreateSubtask }) => {
   const [progress, setProgress] = useState<any>(null);
 
   useEffect(() => {
@@ -145,12 +146,16 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onClick, onCreateSubtask }) =
           <span className="tc-footer-label">Assignee</span>
           <div className="tc-assignee">
             <div className="tc-avatar">
-              {task.assignedTo?.name ? (
-                <img src={`https://ui-avatars.com/api/?name=${encodeURIComponent(task.assignedTo.name)}&background=e2e8f0&color=0f172a`} alt="avatar" />
+              {(task.delegatedTo && currentUser?.role !== 'super_admin') ? (
+                <img src={`https://ui-avatars.com/api/?name=${encodeURIComponent(task.delegatedTo.name)}&background=e2e8f0&color=0f172a`} alt="avatar" title={`Delegated to ${task.delegatedTo.name}`} />
+              ) : task.assignedTo?.name ? (
+                <img src={`https://ui-avatars.com/api/?name=${encodeURIComponent(task.assignedTo.name)}&background=e2e8f0&color=0f172a`} alt="avatar" title={`Assigned to ${task.assignedTo.name}`} />
               ) : '?'}
             </div>
             <span className="tc-assignee-id">
-              {task.assignedTo ? task.assignedTo.employeeId || task.assignedTo.name.substring(0, 8) : 'Unassigned'}
+              {(task.delegatedTo && currentUser?.role !== 'super_admin') ? 
+                (task.delegatedTo.employeeId || task.delegatedTo.name.substring(0, 8)) : 
+                (task.assignedTo ? task.assignedTo.employeeId || task.assignedTo.name.substring(0, 8) : 'Unassigned')}
             </span>
           </div>
         </div>

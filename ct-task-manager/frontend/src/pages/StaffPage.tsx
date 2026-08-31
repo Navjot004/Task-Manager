@@ -12,25 +12,27 @@ import { api, Task } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { Link } from 'react-router-dom';
 import { calculateUrgency, getUrgencyCardStyle, getUrgencyLabel, getUrgencyColor } from '../utils/taskUrgency';
+import TaskModal from '../components/TaskModal';
 import './StaffPage.css';
 
 const StaffPage: React.FC = () => {
   const { currentUser: user } = useAuth();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedTask, setSelectedTask] = useState<any>(null);
+
+  const fetchTasks = async () => {
+    try {
+      const res = await api.getTasks({});
+      setTasks(res.data.tasks || []);
+    } catch (err) {
+      console.error('Failed to fetch tasks', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchTasks = async () => {
-      try {
-        const res = await api.getTasks({});
-        // For staff, api.getTasks should already filter by assignedTo
-        setTasks(res.data.tasks || []);
-      } catch (err) {
-        console.error('Failed to fetch tasks', err);
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchTasks();
   }, []);
 
@@ -151,7 +153,12 @@ const StaffPage: React.FC = () => {
                   const urgencyColor = getUrgencyColor(urgency);
                   
                   return (
-                    <tr key={task._id || task.id} style={{ backgroundColor: cardStyle.backgroundColor }}>
+                    <tr 
+                      key={task._id || task.id} 
+                      style={{ backgroundColor: cardStyle.backgroundColor, cursor: 'pointer' }}
+                      onClick={() => setSelectedTask(task)}
+                      className="hover:bg-slate-50 transition-colors"
+                    >
                       <td style={{ borderLeft: cardStyle.borderLeft, paddingLeft: '1rem' }}>
                         <div className="staff-task-name">{task.title}</div>
                         <div className="staff-task-sub">ID: {task._id?.substring(0,5) || task.id?.substring(0,5)}</div>
@@ -255,6 +262,19 @@ const StaffPage: React.FC = () => {
         </div>
 
       </div>
+      
+      {selectedTask && (
+        <TaskModal 
+          task={selectedTask} 
+          currentUser={user}
+          availableAssignees={[]}
+          onClose={() => setSelectedTask(null)}
+          onRefresh={() => {
+            fetchTasks();
+            api.getTaskById(selectedTask._id || selectedTask.id).then(res => setSelectedTask(res.data.task)).catch(() => setSelectedTask(null));
+          }}
+        />
+      )}
     </div>
   );
 };

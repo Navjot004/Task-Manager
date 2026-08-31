@@ -12,6 +12,7 @@ import SuperAdminStaffAssignmentsPage from '../pages/SuperAdminStaffAssignmentsP
 import SuperAdminDepartmentsPage from '../pages/SuperAdminDepartmentsPage';
 import DeptAdminStaffPage from '../pages/DeptAdminStaffPage';
 import TasksPage from '../pages/TasksPage';
+import NaacDashboardPage from '../pages/NaacDashboardPage';
 import { AuthProvider } from '../context/AuthContext';
 import ProtectedRoute from '../components/ProtectedRoute';
 import SuperAdminLayout from '../components/SuperAdminLayout';
@@ -39,7 +40,7 @@ const AppRouter = () => {
             <Route path="staff-manage" element={<SuperAdminStaffAssignmentsPage />} />
             <Route path="tasks" element={<TasksPage />} />
             <Route path="departments" element={<SuperAdminDepartmentsPage />} />
-            <Route path="settings" element={<div>Settings Work In Progress</div>} />
+            <Route path="naac" element={<NaacDashboardPage />} />
             <Route path="alerts" element={<div>Alerts Work In Progress</div>} />
             <Route path="more" element={<div>More Options</div>} />
           </Route>

@@ -134,8 +134,8 @@ export const createTask = async (req: Request, res: Response) => {
     await task.save();
 
     const populatedTask = await Task.findById(task._id)
-      .populate('createdBy', 'name role')
-      .populate('assignedTo', 'name role department')
+      .populate('createdBy', 'name role universityId')
+      .populate('assignedTo', 'name role department universityId')
       .populate('parentTaskId', 'taskId title');
 
     return res.status(201).json({ success: true, data: { task: populatedTask } });
@@ -157,26 +157,39 @@ export const getTasks = async (req: Request, res: Response) => {
     const workflow = req.query.workflow as string;
     const reviewStage = req.query.reviewStage as string;
     const taskType = req.query.taskType as string; // 'All', 'main', 'subtask'
+    const sortBy = req.query.sortBy as string;
 
     const query: any = {};
     const user = req.user;
 
     // Build visibility query based on role
     if (user.role === 'staff') {
-      // Staff can only see tasks assigned to them
-      query.assignedTo = user._id;
+      // Staff can only see tasks assigned to them or delegated to them
+      query.$or = [
+        { assignedTo: user._id },
+        { delegatedTo: user._id }
+      ];
     } else if (user.role === 'department_admin') {
-      // Department admin sees tasks they created, assigned to them, or assigned to their staff
+      // Department admin sees tasks they created, assigned/delegated to them, or assigned/delegated to their staff
       const myStaffAssignments = await StaffAssignment.find({ adminId: user._id, isActive: true });
       const myStaffIds = myStaffAssignments.map(a => a.staffId);
       
       query.$or = [
         { createdBy: user._id },
         { assignedTo: user._id },
-        { assignedTo: { $in: myStaffIds } }
+        { delegatedTo: user._id },
+        { assignedTo: { $in: myStaffIds } },
+        { delegatedTo: { $in: myStaffIds } }
       ];
+    } else if (user.role === 'super_admin') {
+      // Super admin sees all main tasks, and any subtasks they created themselves
+      if (!taskType) {
+        query.$or = [
+          { isSubtask: { $ne: true } },
+          { isSubtask: true, createdBy: user._id }
+        ];
+      }
     }
-    // super_admin sees all by default
 
     // Filters
     if (status && status !== 'All') {
@@ -204,13 +217,14 @@ export const getTasks = async (req: Request, res: Response) => {
     if (assignee) {
       if (assignee === 'Unassigned') {
         query.assignedTo = null;
+        query.delegatedTo = null;
       } else if (assignee !== 'All') {
-        // Only apply if it doesn't conflict with visibility constraints
+        const assigneeCond = { $or: [{ assignedTo: assignee }, { delegatedTo: assignee }] };
         if (query.$or) {
-          query.$and = [{ $or: query.$or }, { assignedTo: assignee }];
+          query.$and = [{ $or: query.$or }, assigneeCond];
           delete query.$or;
         } else {
-          query.assignedTo = assignee;
+          Object.assign(query, assigneeCond);
         }
       }
     }
@@ -218,9 +232,23 @@ export const getTasks = async (req: Request, res: Response) => {
     // Search
     if (search) {
       const searchRegex = new RegExp(search, 'i');
-      const searchCond = {
-        $or: [{ title: searchRegex }, { description: searchRegex }]
+      
+      // Find users whose name matches the search term
+      const matchingUsers = await User.find({ name: searchRegex }).select('_id');
+      const matchingUserIds = matchingUsers.map(u => u._id);
+
+      const searchCond: any = {
+        $or: [
+          { title: searchRegex }, 
+          { description: searchRegex },
+          { taskId: searchRegex }
+        ]
       };
+
+      if (matchingUserIds.length > 0) {
+        searchCond.$or.push({ assignedTo: { $in: matchingUserIds } });
+        searchCond.$or.push({ delegatedTo: { $in: matchingUserIds } });
+      }
       
       if (query.$and) {
         query.$and.push(searchCond);
@@ -233,11 +261,19 @@ export const getTasks = async (req: Request, res: Response) => {
     }
 
     const total = await Task.countDocuments(query);
+    
+    let sortObj: any = { deadline: 1, createdAt: -1 }; // default
+    if (sortBy === 'createdAt_desc') sortObj = { createdAt: -1 };
+    else if (sortBy === 'createdAt_asc') sortObj = { createdAt: 1 };
+    else if (sortBy === 'title_asc') sortObj = { title: 1 };
+    else if (sortBy === 'title_desc') sortObj = { title: -1 };
+
     const tasks = await Task.find(query)
-      .populate('createdBy', 'name role')
-      .populate('assignedTo', 'name role department')
+      .populate('createdBy', 'name role universityId')
+      .populate('assignedTo', 'name role department universityId')
+      .populate('delegatedTo', 'name role department universityId')
       .populate('parentTaskId', 'taskId title')
-      .sort({ deadline: 1, createdAt: -1 })
+      .sort(sortObj)
       .skip((page - 1) * limit)
       .limit(limit);
 
@@ -258,8 +294,8 @@ export const getTasks = async (req: Request, res: Response) => {
 export const getTaskById = async (req: Request, res: Response) => {
   try {
     const task = await Task.findById(req.params.id)
-      .populate('createdBy', 'name role')
-      .populate('assignedTo', 'name role department')
+      .populate('createdBy', 'name role universityId')
+      .populate('assignedTo', 'name role department universityId')
       .populate('parentTaskId', 'taskId title');
       
     if (!task) return res.status(404).json({ success: false, message: 'Task not found' });
@@ -351,7 +387,12 @@ export const assignTask = async (req: Request, res: Response) => {
           return res.status(403).json({ success: false, message: 'Forbidden. Cannot unassign this task.' });
         }
       }
-      task.assignedTo = null;
+      // If we are unassigning
+      if (task.delegatedTo) {
+         task.delegatedTo = null; // Unassign delegation
+      } else {
+         task.assignedTo = null;
+      }
     } else {
       // Assign
       const targetUser = await User.findById(assignedTo);
@@ -390,14 +431,25 @@ export const assignTask = async (req: Request, res: Response) => {
         task.workflowType = 'department_admin';
       }
 
-      task.assignedTo = assignedTo;
+      // Delegation logic
+      if (
+        user.role === 'department_admin' && 
+        task.assignedTo && 
+        task.assignedTo.toString() === user._id.toString() && 
+        targetUser.role === 'staff'
+      ) {
+        task.delegatedTo = assignedTo; // Delegate to staff
+      } else {
+        task.assignedTo = assignedTo; // Normal assignment
+        task.delegatedTo = null; // Clear delegation if any
+      }
     }
 
     await task.save();
 
     const populatedTask = await Task.findById(task._id)
-      .populate('createdBy', 'name role')
-      .populate('assignedTo', 'name role department')
+      .populate('createdBy', 'name role universityId')
+      .populate('assignedTo', 'name role department universityId')
       .populate('parentTaskId', 'taskId title');
 
     return res.status(200).json({ success: true, data: { task: populatedTask } });
@@ -529,7 +581,16 @@ export const submitReview = async (req: Request, res: Response) => {
     task.status = 'submitted_for_review';
     task.reviewRequestedBy = user._id;
 
-    if (task.workflowType === 'super_admin_direct') {
+    if (task.isSubtask) {
+      // Subtasks go directly to their creator for final review
+      const creator = await User.findById(task.createdBy);
+      task.reviewStage = creator?.role || 'super_admin';
+      task.currentReviewer = task.createdBy;
+    } else if (task.delegatedTo && task.delegatedTo.toString() === user._id.toString()) {
+      // Delegated task submitted by staff: goes to Dept Admin
+      task.reviewStage = 'department_admin';
+      task.currentReviewer = task.assignedTo;
+    } else if (task.workflowType === 'super_admin_direct') {
       task.reviewStage = 'super_admin';
       task.currentReviewer = task.createdBy; 
     } else if (task.workflowType === 'department_admin') {
@@ -598,7 +659,31 @@ export const reviewTask = async (req: Request, res: Response) => {
     }
 
     if (decision === 'approved') {
-      if (user.role === 'super_admin') {
+      // Subtasks are fully approved once the creator approves them
+      if (task.isSubtask && task.createdBy.toString() === user._id.toString()) {
+        task.status = 'approved';
+        task.reviewStage = 'none';
+        task.currentReviewer = null;
+        task.rejectionReason = null;
+      }
+      // Multi-stage delegated task logic
+      else if (task.delegatedTo && user.role === 'department_admin') {
+        // Dept admin approved a delegated task, send to Super Admin if Super Admin created it
+        // Or if super_admin assigned it to them
+        const creator = await User.findById(task.createdBy);
+        if (creator && creator.role === 'super_admin') {
+          task.reviewStage = 'super_admin';
+          task.status = 'submitted_for_review'; // Stays in review, but moved to super admin
+          task.currentReviewer = task.createdBy; 
+          task.rejectionReason = null;
+        } else {
+          // If the dept admin created it and delegated it, they are the final reviewer
+          task.status = 'approved';
+          task.reviewStage = 'none';
+          task.currentReviewer = null;
+          task.rejectionReason = null;
+        }
+      } else if (user.role === 'super_admin') {
         task.status = 'approved';
         task.reviewStage = 'none';
         task.currentReviewer = null;
@@ -606,7 +691,7 @@ export const reviewTask = async (req: Request, res: Response) => {
       } else if (task.reviewStage === 'department_admin') {
         task.reviewStage = 'super_admin';
         task.status = 'submitted_for_review'; // Stays in review, but moved to super admin
-        task.currentReviewer = null; 
+        task.currentReviewer = task.createdBy; 
         task.rejectionReason = null;
       } else if (task.reviewStage === 'super_admin') {
         task.status = 'approved';
@@ -713,8 +798,8 @@ export const createSubtask = async (req: Request, res: Response) => {
     await subtask.save();
 
     const populatedSubtask = await Task.findById(subtask._id)
-      .populate('createdBy', 'name role')
-      .populate('assignedTo', 'name role department')
+      .populate('createdBy', 'name role universityId')
+      .populate('assignedTo', 'name role department universityId')
       .populate('parentTaskId', 'taskId title');
 
     return res.status(201).json({ success: true, data: { task: populatedSubtask } });
@@ -751,8 +836,8 @@ export const getSubtasks = async (req: Request, res: Response) => {
     // Super Admin sees all
 
     const subtasks = await Task.find(query)
-      .populate('createdBy', 'name role')
-      .populate('assignedTo', 'name role department')
+      .populate('createdBy', 'name role universityId')
+      .populate('assignedTo', 'name role department universityId')
       .populate('parentTaskId', 'taskId title')
       .sort({ createdAt: -1 });
 
@@ -800,6 +885,113 @@ export const getTaskProgress = async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error('Error fetching task progress:', error);
+    return res.status(500).json({ success: false, message: 'Server Error' });
+  }
+};
+
+// GET /api/tasks/naac-report
+export const getNaacReport = async (req: Request, res: Response) => {
+  try {
+    const User = require('../models/User').default;
+    const StaffAssignment = require('../models/StaffAssignment').default;
+    
+    // 1. Fetch all department admins
+    const deptAdmins = await User.find({ role: 'department_admin', isActive: true }).select('_id name role department');
+
+    const deptMap: { [dept: string]: any } = {};
+    const allUserIdsToFetchTasks: mongoose.Types.ObjectId[] = [];
+
+    // 2. Build the structure based on admins and their assigned staff
+    for (const admin of deptAdmins) {
+      const deptName = admin.department || 'Unassigned Department';
+      if (!deptMap[deptName]) {
+        deptMap[deptName] = {
+          department: deptName,
+          totalTasksGiven: 0,
+          totalTasksPending: 0,
+          totalTasksInReview: 0,
+          totalTasksCompleted: 0,
+          users: []
+        };
+      }
+
+      // Add admin to their department
+      deptMap[deptName].users.push({
+        _id: admin._id,
+        name: admin.name,
+        role: admin.role,
+        department: admin.department,
+        tasksGiven: 0,
+        tasksPending: 0,
+        tasksInReview: 0,
+        tasksCompleted: 0
+      });
+      allUserIdsToFetchTasks.push(admin._id);
+
+      // 3. Find their staff members from StaffAssignment
+      const assignments = await StaffAssignment.find({ adminId: admin._id, isActive: true });
+      const staffIds = assignments.map((a: any) => a.staffId);
+      
+      const staffMembers = await User.find({ _id: { $in: staffIds }, isActive: true }).select('_id name role department');
+
+      for (const staff of staffMembers) {
+        // Prevent duplicate staff if already added
+        if (!deptMap[deptName].users.find((u: any) => u._id.toString() === staff._id.toString())) {
+          deptMap[deptName].users.push({
+            _id: staff._id,
+            name: staff.name,
+            role: staff.role,
+            department: staff.department,
+            tasksGiven: 0,
+            tasksPending: 0,
+            tasksInReview: 0,
+            tasksCompleted: 0
+          });
+          allUserIdsToFetchTasks.push(staff._id);
+        }
+      }
+    }
+
+    // 4. Fetch tasks for all these users
+    const tasks = await Task.find({
+      $or: [
+        { assignedTo: { $in: allUserIdsToFetchTasks } },
+        { delegatedTo: { $in: allUserIdsToFetchTasks } }
+      ]
+    }).select('assignedTo delegatedTo status');
+
+    // 5. Process data and counts
+    Object.values(deptMap).forEach((deptObj: any) => {
+      deptObj.users.forEach((userObj: any) => {
+        const userTasks = tasks.filter(t => {
+          // Count for the "lowest" assignee
+          const currentAssignee = t.delegatedTo ? t.delegatedTo.toString() : (t.assignedTo ? t.assignedTo.toString() : null);
+          return currentAssignee === userObj._id.toString();
+        });
+
+        userObj.tasksGiven = userTasks.length;
+        userObj.tasksCompleted = userTasks.filter(t => t.status === 'approved').length;
+        userObj.tasksPending = userTasks.filter(t => t.status === 'pending' || t.status === 'in_progress' || t.status === 'rejected' || t.status === 'completed').length;
+        userObj.tasksInReview = userTasks.filter(t => t.status === 'submitted_for_review').length;
+
+        deptObj.totalTasksGiven += userObj.tasksGiven;
+        deptObj.totalTasksPending += userObj.tasksPending;
+        deptObj.totalTasksInReview += userObj.tasksInReview;
+        deptObj.totalTasksCompleted += userObj.tasksCompleted;
+      });
+      
+      // Sort users inside dept: Admin first, then staff by name
+      deptObj.users.sort((a: any, b: any) => {
+        if (a.role === 'department_admin' && b.role !== 'department_admin') return -1;
+        if (b.role === 'department_admin' && a.role !== 'department_admin') return 1;
+        return a.name.localeCompare(b.name);
+      });
+    });
+
+    const result = Object.values(deptMap);
+    return res.status(200).json({ success: true, data: result });
+  } catch (error) {
+    console.error('Error fetching NAAC report:', error);
     return res.status(500).json({ success: false, message: 'Server Error' });
   }
 };

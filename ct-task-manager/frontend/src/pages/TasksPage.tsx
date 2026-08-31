@@ -21,7 +21,7 @@ const TasksPage: React.FC = () => {
   const [totalPages, setTotalPages] = useState(1);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
-  const [assigneeFilter, setAssigneeFilter] = useState('All');
+  const [sortByFilter, setSortByFilter] = useState('default');
   const [workflowFilter, setWorkflowFilter] = useState('All');
   const [reviewStageFilter, setReviewStageFilter] = useState('All');
   const [taskTypeFilter, setTaskTypeFilter] = useState('All'); // Changed default to 'All' to match mockups
@@ -43,7 +43,7 @@ const TasksPage: React.FC = () => {
         limit: 12,
         search,
         status: statusFilter !== 'All' ? statusFilter : undefined,
-        assignee: assigneeFilter !== 'All' ? assigneeFilter : undefined,
+        sortBy: sortByFilter !== 'default' ? sortByFilter : undefined,
         workflow: workflowFilter !== 'All' ? workflowFilter : undefined,
         reviewStage: reviewStageFilter !== 'All' ? reviewStageFilter : undefined,
         taskType: taskTypeFilter !== 'All' ? taskTypeFilter : undefined,
@@ -100,7 +100,7 @@ const TasksPage: React.FC = () => {
     if (user && !isCreatingTask) {
       loadTasks();
     }
-  }, [page, statusFilter, assigneeFilter, workflowFilter, reviewStageFilter, taskTypeFilter, user, search, isCreatingTask]);
+  }, [page, statusFilter, sortByFilter, workflowFilter, reviewStageFilter, taskTypeFilter, user, search, isCreatingTask]);
 
   const handleCreateTaskSubmit = async (taskData: FormData | FormData[]) => {
     setError('');
@@ -135,6 +135,7 @@ const TasksPage: React.FC = () => {
         }}
         availableAssignees={availableAssignees}
         preselectedParentTask={creatingSubtaskFor}
+        currentUser={user}
       />
     );
   }
@@ -212,15 +213,13 @@ const TasksPage: React.FC = () => {
             <option value="subtask">Subtask</option>
           </select>
 
-          {user?.role !== 'staff' && (
-            <select className="tasks-filter-select" value={assigneeFilter} onChange={e => { setAssigneeFilter(e.target.value); setPage(1); }}>
-              <option value="All">Assignee: All</option>
-              <option value="Unassigned">Unassigned</option>
-              {availableAssignees.map(a => (
-                <option key={a.id} value={a.id}>{a.name}</option>
-              ))}
-            </select>
-          )}
+          <select className="tasks-filter-select" value={sortByFilter} onChange={e => { setSortByFilter(e.target.value); setPage(1); }}>
+            <option value="default">Sort: Default</option>
+            <option value="createdAt_desc">Newest First</option>
+            <option value="createdAt_asc">Oldest First</option>
+            <option value="title_asc">Title (A-Z)</option>
+            <option value="title_desc">Title (Z-A)</option>
+          </select>
         </div>
 
         {error && <div className="error-message" style={{ marginBottom: '1rem' }}>{error}</div>}
@@ -246,6 +245,7 @@ const TasksPage: React.FC = () => {
                 <TaskCard 
                   key={task._id} 
                   task={task} 
+                  currentUser={user}
                   onClick={() => setSelectedTask(task)} 
                   onCreateSubtask={() => handleCreateSubtaskForTask(task._id)}
                 />

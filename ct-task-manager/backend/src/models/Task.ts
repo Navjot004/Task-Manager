@@ -7,6 +7,7 @@ export interface ITask extends Document {
   description: string;
   createdBy: mongoose.Types.ObjectId;
   assignedTo: mongoose.Types.ObjectId | null;
+  delegatedTo: mongoose.Types.ObjectId | null;
   deadline: Date;
   status: 'pending' | 'in_progress' | 'completed' | 'submitted_for_review' | 'approved' | 'rejected';
   parentTaskId: mongoose.Types.ObjectId | null;
@@ -48,6 +49,12 @@ const taskSchema = new Schema<ITask>(
       index: true,
     },
     assignedTo: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+      index: true,
+    },
+    delegatedTo: {
       type: Schema.Types.ObjectId,
       ref: 'User',
       default: null,

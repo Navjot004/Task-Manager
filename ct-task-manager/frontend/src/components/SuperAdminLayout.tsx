@@ -11,6 +11,7 @@ import {
   UserPlus, 
   Building, 
   Settings,
+  BarChart2,
   Search,
   Bell,
   Menu,
@@ -97,8 +98,8 @@ const SuperAdminLayout: React.FC = () => {
           <NavLink to="/super-admin/departments" className={({ isActive }) => `sa-nav-item ${isActive ? 'active' : ''}`} onClick={() => setIsMobileSidebarOpen(false)}>
             <Building size={18} /> Departments
           </NavLink>
-          <NavLink to="/super-admin/settings" className={({ isActive }) => `sa-nav-item ${isActive ? 'active' : ''}`} onClick={() => setIsMobileSidebarOpen(false)}>
-            <Settings size={18} /> Settings
+          <NavLink to="/super-admin/naac" className={({ isActive }) => `sa-nav-item ${isActive ? 'active' : ''}`} onClick={() => setIsMobileSidebarOpen(false)}>
+            <BarChart2 size={18} /> NAAC Dashboard
           </NavLink>
         </nav>
 

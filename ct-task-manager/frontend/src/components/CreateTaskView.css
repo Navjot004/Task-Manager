@@ -68,7 +68,6 @@
   background-color: #ffffff;
   border-radius: 8px;
   box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-  overflow: hidden;
 }
 
 .ct-form-section {
@@ -314,9 +313,10 @@
   border-radius: 8px;
   box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
   z-index: 50;
-  max-height: 250px;
+  max-height: 300px;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .ct-dropdown-search {
@@ -351,6 +351,8 @@
   padding: 0;
   margin: 0;
   overflow-y: auto;
+  flex: 1;
+  min-height: 0;
 }
 
 .ct-dropdown-item {
@@ -597,4 +599,56 @@
     flex-direction: column;
     gap: 1rem;
   }
+}
+
+/* Custom Dropdown Filters */
+.ct-dropdown-search-container {
+  padding: 0.5rem;
+  border-bottom: 1px solid #e2e8f0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.ct-dropdown-search-container .ct-dropdown-search {
+  padding: 0;
+  border-bottom: none;
+}
+
+.ct-role-filters {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.ct-role-filter-btn {
+  flex: 1;
+  padding: 0.25rem;
+  font-size: 0.75rem;
+  background: #f1f5f9;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  color: #475569;
+  transition: all 0.2s;
+}
+
+.ct-role-filter-btn:hover {
+  background: #e2e8f0;
+}
+
+.ct-role-filter-btn.active {
+  background: #0f172a;
+  color: white;
+}
+
+.ct-assignee-item {
+  justify-content: space-between;
+}
+
+.ct-assignee-role {
+  font-size: 0.7rem;
+  color: #64748b;
+  background: #e2e8f0;
+  padding: 0.1rem 0.3rem;
+  border-radius: 4px;
 }

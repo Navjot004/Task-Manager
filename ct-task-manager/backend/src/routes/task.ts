@@ -10,7 +10,8 @@ import {
   reviewTask,
   createSubtask,
   getSubtasks,
-  getTaskProgress
+  getTaskProgress,
+  getNaacReport
 } from '../controllers/taskController';
 import { authenticate, authorizeRoles } from '../middleware/auth';
 import { uploadAny } from '../middleware/upload';
@@ -23,6 +24,11 @@ router.use(authenticate);
 // @desc    Create a task
 // @access  Super Admin, Department Admin
 router.post('/', authorizeRoles('super_admin', 'department_admin'), uploadAny.array('attachments'), createTask);
+
+// @route   GET /api/tasks/naac-report
+// @desc    Get department-wise NAAC report
+// @access  Super Admin
+router.get('/naac-report', authorizeRoles('super_admin'), getNaacReport);
 
 // @route   GET /api/tasks
 // @desc    Get all visible tasks with filtering/pagination

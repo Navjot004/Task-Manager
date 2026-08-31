@@ -250,6 +250,7 @@ export const api = {
     search?: string;
     role?: string;
     status?: string;
+    unassignedOnly?: boolean;
   }): Promise<{ success: boolean; data: { users: User[]; pagination: Pagination } }> => {
     const query = new URLSearchParams();
     if (params.page) query.set('page', String(params.page));
@@ -257,6 +258,7 @@ export const api = {
     if (params.search) query.set('search', params.search);
     if (params.role) query.set('role', params.role);
     if (params.status) query.set('status', params.status);
+    if (params.unassignedOnly) query.set('unassignedOnly', 'true');
 
     return fetchWithAuth(`/api/users?${query.toString()}`);
   },
@@ -382,13 +384,14 @@ export const api = {
     return json;
   },
 
-  getTasks: async (params: { page?: number; limit?: number; search?: string; status?: string; assignee?: string; workflow?: string; reviewStage?: string; taskType?: string }): Promise<{ success: boolean; data: { tasks: any[]; pagination: Pagination } }> => {
+  getTasks: async (params: { page?: number; limit?: number; search?: string; status?: string; assignee?: string; sortBy?: string; workflow?: string; reviewStage?: string; taskType?: string }): Promise<{ success: boolean; data: { tasks: any[]; pagination: Pagination } }> => {
     const query = new URLSearchParams();
     if (params.page) query.set('page', String(params.page));
     if (params.limit) query.set('limit', String(params.limit));
     if (params.search) query.set('search', params.search);
     if (params.status) query.set('status', params.status);
     if (params.assignee) query.set('assignee', params.assignee);
+    if (params.sortBy) query.set('sortBy', params.sortBy);
     if (params.workflow) query.set('workflow', params.workflow);
     if (params.reviewStage) query.set('reviewStage', params.reviewStage);
     if (params.taskType) query.set('taskType', params.taskType);
@@ -448,13 +451,16 @@ export const api = {
       headers: {
         'Authorization': `Bearer ${tokenStorage.getToken()}`
       },
-      body: formData || null,
+      body: formData || new FormData(),
     });
     const json = await response.json();
-    if (!response.ok) throw new Error(json.message || 'Failed to submit task for review');
+    if (!response.ok) throw new Error(json.message || 'Failed to submit for review');
     return json;
   },
 
+  getNaacReport: async (): Promise<{ success: boolean; data: any }> => {
+    return fetchWithAuth(`/api/tasks/naac-report`);
+  },
   reviewTask: async (taskId: string, decision: 'approved' | 'rejected', reason?: string): Promise<{ success: boolean; data: { task: any } }> => {
     return fetchWithAuth(`/api/tasks/${taskId}/review`, {
       method: 'PATCH',
@@ -477,5 +483,12 @@ export const api = {
 
   getTaskProgress: async (taskId: string): Promise<{ success: boolean; data: any }> => {
     return fetchWithAuth(`/api/tasks/${taskId}/progress`);
+  },
+
+  getFileMetadata: async (fileId: string): Promise<{ success: boolean; data: { file: any } }> => {
+    const response = await fetch(`${API_URL}/api/files/${fileId}/metadata`);
+    const json = await response.json();
+    if (!response.ok) throw new Error(json.message || 'Failed to fetch file metadata');
+    return json;
   }
 };

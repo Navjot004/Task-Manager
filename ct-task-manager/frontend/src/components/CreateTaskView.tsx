@@ -8,9 +8,10 @@ interface CreateTaskViewProps {
   onCancel: () => void;
   availableAssignees: any[];
   preselectedParentTask?: string | null;
+  currentUser?: any;
 }
 
-const CreateTaskView: React.FC<CreateTaskViewProps> = ({ onSubmit, onCancel, availableAssignees, preselectedParentTask }) => {
+const CreateTaskView: React.FC<CreateTaskViewProps> = ({ onSubmit, onCancel, availableAssignees, preselectedParentTask, currentUser }) => {
   const [loading, setLoading] = useState(false);
   const [isSubtaskMode, setIsSubtaskMode] = useState(!!preselectedParentTask);
   const [parentTaskId, setParentTaskId] = useState(preselectedParentTask || '');
@@ -45,6 +46,12 @@ const CreateTaskView: React.FC<CreateTaskViewProps> = ({ onSubmit, onCancel, ava
   const [searchQuery, setSearchQuery] = useState('');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  
+  const [isAssignDropdownOpen, setIsAssignDropdownOpen] = useState(false);
+  const [assignSearchQuery, setAssignSearchQuery] = useState('');
+  const [assignRoleFilter, setAssignRoleFilter] = useState<'all' | 'admin' | 'staff'>('all');
+  const assignDropdownRef = useRef<HTMLDivElement>(null);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Close dropdown when clicking outside
@@ -52,6 +59,9 @@ const CreateTaskView: React.FC<CreateTaskViewProps> = ({ onSubmit, onCancel, ava
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsDropdownOpen(false);
+      }
+      if (assignDropdownRef.current && !assignDropdownRef.current.contains(event.target as Node)) {
+        setIsAssignDropdownOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -106,6 +116,27 @@ const CreateTaskView: React.FC<CreateTaskViewProps> = ({ onSubmit, onCancel, ava
   });
 
   const selectedTask = mainTasks.find(mt => mt._id === parentTaskId);
+
+  const formatNameString = (userObj: any) => {
+    if (!userObj) return 'Unassigned';
+    const isMe = currentUser && (userObj._id === currentUser.id || userObj.id === currentUser.id);
+    const name = isMe ? 'me' : userObj.name;
+    const staffId = userObj.universityId || 'N/A';
+    return `${name} (ID: ${staffId})`;
+  };
+
+  const filteredAssignees = availableAssignees.filter(a => {
+    if (assignRoleFilter === 'admin' && !a.role.includes('admin')) return false;
+    if (assignRoleFilter === 'staff' && a.role !== 'staff') return false;
+    
+    if (assignSearchQuery) {
+      const q = assignSearchQuery.toLowerCase();
+      return a.name.toLowerCase().includes(q) || 
+             a.role.toLowerCase().includes(q) || 
+             (a.universityId && a.universityId.toLowerCase().includes(q));
+    }
+    return true;
+  });
 
   return (
     <div className="create-task-view">
@@ -277,18 +308,84 @@ const CreateTaskView: React.FC<CreateTaskViewProps> = ({ onSubmit, onCancel, ava
           <div className="ct-row">
             <div className="ct-input-group">
               <label className="ct-label">ASSIGN TO</label>
-              <div className="ct-select-container">
-                <select 
-                  className="ct-select"
-                  value={tasksToCreate[activeTab].assignedTo}
-                  onChange={e => setTasksToCreate(prev => { const n = [...prev]; const t = {...n[activeTab]}; t.assignedTo = e.target.value; n[activeTab] = t; return n; })}
+              <div className="ct-custom-select-wrapper" ref={assignDropdownRef}>
+                <div 
+                  className={`ct-custom-select ${isAssignDropdownOpen ? 'open' : ''}`}
+                  onClick={() => setIsAssignDropdownOpen(!isAssignDropdownOpen)}
                 >
-                  <option value="">Unassigned (Open Pool)</option>
-                  {availableAssignees.map(a => (
-                    <option key={a.id} value={a.id}>{a.name} ({a.role})</option>
-                  ))}
-                </select>
-                <ChevronDown className="ct-select-icon" size={16} />
+                  {tasksToCreate[activeTab].assignedTo ? (
+                    <span>{formatNameString(availableAssignees.find(a => a.id === tasksToCreate[activeTab].assignedTo))}</span>
+                  ) : (
+                    <span className="placeholder">Unassigned</span>
+                  )}
+                  <ChevronDown className="ct-select-icon" size={16} />
+                </div>
+                
+                {isAssignDropdownOpen && (
+                  <div className="ct-dropdown-menu">
+                    <div className="ct-dropdown-search-container">
+                      <div className="ct-dropdown-search">
+                        <Search size={14} className="ct-search-icon" />
+                        <input 
+                          type="text" 
+                          placeholder="Search users..." 
+                          value={assignSearchQuery}
+                          onChange={(e) => setAssignSearchQuery(e.target.value)}
+                          onClick={(e) => e.stopPropagation()}
+                          autoFocus
+                        />
+                      </div>
+                      
+                      {currentUser?.role === 'super_admin' && (
+                        <div className="ct-role-filters">
+                          <button 
+                            type="button"
+                            className={`ct-role-filter-btn ${assignRoleFilter === 'all' ? 'active' : ''}`}
+                            onClick={(e) => { e.stopPropagation(); setAssignRoleFilter('all'); }}
+                          >All</button>
+                          <button 
+                            type="button"
+                            className={`ct-role-filter-btn ${assignRoleFilter === 'admin' ? 'active' : ''}`}
+                            onClick={(e) => { e.stopPropagation(); setAssignRoleFilter('admin'); }}
+                          >Admins</button>
+                          <button 
+                            type="button"
+                            className={`ct-role-filter-btn ${assignRoleFilter === 'staff' ? 'active' : ''}`}
+                            onClick={(e) => { e.stopPropagation(); setAssignRoleFilter('staff'); }}
+                          >Staff</button>
+                        </div>
+                      )}
+                    </div>
+                    <ul className="ct-dropdown-list">
+                      <li 
+                        className={`ct-dropdown-item ${!tasksToCreate[activeTab].assignedTo ? 'selected' : ''}`}
+                        onClick={() => {
+                          setTasksToCreate(prev => { const n = [...prev]; const t = {...n[activeTab]}; t.assignedTo = ''; n[activeTab] = t; return n; });
+                          setIsAssignDropdownOpen(false);
+                        }}
+                      >
+                        Unassigned
+                      </li>
+                      {filteredAssignees.length === 0 && (
+                        <li className="ct-dropdown-item empty">No users found</li>
+                      )}
+                      {filteredAssignees.map(a => (
+                        <li 
+                          key={a.id}
+                          className={`ct-dropdown-item ${tasksToCreate[activeTab].assignedTo === a.id ? 'selected' : ''} ct-assignee-item`}
+                          onClick={() => {
+                            setTasksToCreate(prev => { const n = [...prev]; const t = {...n[activeTab]}; t.assignedTo = a.id; n[activeTab] = t; return n; });
+                            setIsAssignDropdownOpen(false);
+                            setAssignSearchQuery('');
+                          }}
+                        >
+                          <span>{currentUser && a.id === currentUser.id ? 'me' : a.name}</span>
+                          <span className="ct-assignee-role">(ID: {a.universityId || 'N/A'})</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
             </div>
 

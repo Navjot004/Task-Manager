@@ -10,6 +10,7 @@ export const getUsers = async (req: Request, res: Response) => {
     const search = req.query.search as string;
     const role = req.query.role as string;
     const status = req.query.status as string;
+    const unassignedOnly = req.query.unassignedOnly === 'true';
 
     const query: any = {};
 
@@ -35,6 +36,13 @@ export const getUsers = async (req: Request, res: Response) => {
     // Status filter
     if (status && status !== 'All') {
       query.isActive = status === 'Active';
+    }
+
+    // Unassigned only filter
+    if (unassignedOnly) {
+      const activeAssignments = await StaffAssignment.find({ isActive: true }).select('staffId');
+      const assignedStaffIds = activeAssignments.map(a => a.staffId);
+      query._id = { $nin: assignedStaffIds };
     }
 
     const total = await User.countDocuments(query);
@@ -144,9 +152,33 @@ export const updateUserRole = async (req: Request, res: Response) => {
     
     await userToUpdate.save();
 
+    // Handle Single Admin Per Department rule
+    if (role === 'department_admin' && userToUpdate.department) {
+      // Find if there's already an admin for this department
+      const existingAdmin = await User.findOne({
+        role: 'department_admin',
+        department: userToUpdate.department,
+        _id: { $ne: userToUpdate._id }
+      });
+
+      if (existingAdmin) {
+        // Demote existing admin to staff
+        existingAdmin.role = 'staff';
+        await existingAdmin.save();
+
+        // Transfer their team (active staff assignments) to the new admin
+        await StaffAssignment.updateMany(
+          { adminId: existingAdmin._id, isActive: true },
+          { $set: { adminId: userToUpdate._id } }
+        );
+      }
+    }
+
     // Cascading side-effects for Staff Assignment
     if (oldRole === 'department_admin' && role !== 'department_admin') {
       // Deactivate all staff assignments where this user was the admin
+      // Note: If they were demoted because someone else was promoted, their team was already transferred above.
+      // This mainly applies to manual demotions by Super Admin.
       await StaffAssignment.updateMany(
         { adminId: userId, isActive: true },
         { $set: { isActive: false } }

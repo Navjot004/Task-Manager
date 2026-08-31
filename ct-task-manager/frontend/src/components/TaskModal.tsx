@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Search, ChevronDown } from 'lucide-react';
 import { api } from '../services/api';
 import { calculateUrgency, getUrgencyBadgeClass, getUrgencyColor, getUrgencyLabel } from '../utils/taskUrgency';
+import './TaskModal.css';
 
 interface TaskModalProps {
   task: any | null;
@@ -27,17 +29,61 @@ const TaskModal: React.FC<TaskModalProps> = ({ task: initialTask, onClose, onRef
 
   // Assign mode
   const [isAssigning, setIsAssigning] = useState(false);
-  const [assignTarget, setAssignTarget] = useState(task.assignedTo ? task.assignedTo._id : '');
+  const [assignTarget, setAssignTarget] = useState(task.delegatedTo ? task.delegatedTo._id : (task.assignedTo ? task.assignedTo._id : ''));
+  
+  // Custom Assign Dropdown State (Main Task)
+  const [isAssignDropdownOpen, setIsAssignDropdownOpen] = useState(false);
+  const [assignSearchQuery, setAssignSearchQuery] = useState('');
+  const [assignRoleFilter, setAssignRoleFilter] = useState<'all' | 'staff' | 'department_admin'>('all');
+  const assignDropdownRef = useRef<HTMLDivElement>(null);
+
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (assignDropdownRef.current && !assignDropdownRef.current.contains(event.target as Node)) {
+        setIsAssignDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const getFilteredAssignees = (query: string, role: string) => {
+    return availableAssignees.filter(a => {
+      if (role !== 'all' && a.role !== role) return false;
+      if (query) {
+        const q = query.toLowerCase();
+        return a.name.toLowerCase().includes(q) || a.role.toLowerCase().includes(q);
+      }
+      return true;
+    });
+  };
 
   // Review mode
   const [isRejecting, setIsRejecting] = useState(false);
   const [rejectionReason, setRejectionReason] = useState('');
 
+  const formatName = (userObj: any) => {
+    if (!userObj) return <span style={{ color: '#94a3b8' }}>Unassigned</span>;
+    const isMe = userObj._id === currentUser.id || userObj.id === currentUser.id;
+    const name = isMe ? 'me' : userObj.name;
+    const staffId = userObj.universityId || 'N/A';
+    return <>{name} <span style={{ color: '#64748b', fontSize: '0.85rem' }}>(ID: {staffId})</span></>;
+  };
+
+  const formatNameString = (userObj: any) => {
+    if (!userObj) return 'Unassigned';
+    const isMe = userObj._id === currentUser.id || userObj.id === currentUser.id;
+    const name = isMe ? 'me' : userObj.name;
+    const staffId = userObj.universityId || 'N/A';
+    return `${name} (ID: ${staffId})`;
+  };
+
   // Submit Review mode
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
   const [reviewFiles, setReviewFiles] = useState<File[]>([]);
   const [fileError, setFileError] = useState('');
-  const reviewFileInputRef = React.useRef<HTMLInputElement>(null);
+  const reviewFileInputRef = useRef<HTMLInputElement>(null);
 
   const refreshTaskData = async () => {
     try {
@@ -68,7 +114,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ task: initialTask, onClose, onRef
       description: initialTask.description,
       deadline: new Date(initialTask.deadline).toISOString().slice(0, 16)
     });
-    setAssignTarget(initialTask.assignedTo ? initialTask.assignedTo._id : '');
+    setAssignTarget(initialTask.delegatedTo ? initialTask.delegatedTo._id : (initialTask.assignedTo ? initialTask.assignedTo._id : ''));
     setError('');
     
     if (initialTask && !initialTask.isSubtask) {
@@ -85,29 +131,6 @@ const TaskModal: React.FC<TaskModalProps> = ({ task: initialTask, onClose, onRef
     }
   };
 
-  const [isCreatingSubtask, setIsCreatingSubtask] = useState(false);
-  const [newSubtaskData, setNewSubtaskData] = useState({
-    title: '',
-    description: '',
-    deadline: '',
-    assignedTo: ''
-  });
-
-  const handleCreateSubtask = async () => {
-    try {
-      setLoading(true);
-      setError('');
-      await api.createSubtask(task._id, newSubtaskData);
-      setIsCreatingSubtask(false);
-      setNewSubtaskData({ title: '', description: '', deadline: '', assignedTo: '' });
-      fetchSubtasks();
-      onRefresh(); // To update main task progress if needed
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const canEdit = (currentUser.role === 'super_admin' || currentUser.role === 'department_admin') && 
     task.status !== 'submitted_for_review' && task.status !== 'approved';
@@ -115,7 +138,65 @@ const TaskModal: React.FC<TaskModalProps> = ({ task: initialTask, onClose, onRef
   const canAssign = (currentUser.role === 'super_admin' || currentUser.role === 'department_admin') && 
     task.status !== 'submitted_for_review' && task.status !== 'approved';
   
-  const canPerformStaffActions = (currentUser.role === 'staff' && task.assignedTo && task.assignedTo._id === currentUser.id) ||
+  const AttachmentList = ({ fileIds, title }: { fileIds: string[], title: string }) => {
+    const [files, setFiles] = useState<any[]>([]);
+
+    useEffect(() => {
+      const fetchFiles = async () => {
+        try {
+          const fetchedFiles = await Promise.all(
+            fileIds.map(async (id) => {
+              try {
+                const res = await api.getFileMetadata(id);
+                return res.data.file;
+              } catch (e) {
+                return null;
+              }
+            })
+          );
+          setFiles(fetchedFiles.filter(Boolean));
+        } catch (err) {
+          console.error(err);
+        }
+      };
+      if (fileIds && fileIds.length > 0) {
+        fetchFiles();
+      }
+    }, [fileIds]);
+
+    if (!fileIds || fileIds.length === 0) return null;
+
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
+    return (
+      <div style={{ marginTop: '1rem' }}>
+        <div style={{ fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 600, marginBottom: '0.5rem' }}>
+          {title}
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+          {files.length === 0 ? (
+            <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>Loading files...</span>
+          ) : (
+            files.map((file, i) => (
+              <a
+                key={i}
+                href={`${apiUrl}/api/files/${file._id}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', color: '#3b82f6', textDecoration: 'none', fontSize: '0.9rem', backgroundColor: '#f0f9ff', padding: '0.5rem 0.75rem', borderRadius: '0.375rem', border: '1px solid #bae6fd' }}
+              >
+                <svg style={{ width: '16px', height: '16px' }} fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"></path></svg>
+                <span style={{ fontWeight: 500 }}>{file.filename}</span>
+                <span style={{ color: '#94a3b8', fontSize: '0.8rem' }}>({Math.round(file.length / 1024)} KB)</span>
+              </a>
+            ))
+          )}
+        </div>
+      </div>
+    );
+  };
+  
+  const canPerformStaffActions = (currentUser.role === 'staff' && ((task.assignedTo && task.assignedTo._id === currentUser.id) || (task.delegatedTo && task.delegatedTo._id === currentUser.id))) ||
     (currentUser.role === 'department_admin' && task.assignedTo && task.assignedTo._id === currentUser.id);
 
   const canReview = 
@@ -282,23 +363,6 @@ const TaskModal: React.FC<TaskModalProps> = ({ task: initialTask, onClose, onRef
                 {task.isSubtask && <span style={{ fontSize: '0.7rem', backgroundColor: '#e2e8f0', color: '#475569', padding: '0.2rem 0.6rem', borderRadius: '4px', verticalAlign: 'middle' }}>SUBTASK</span>}
               </h2>
               <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                {!task.isSubtask && onCreateSubtask && task.status !== 'completed' && task.status !== 'approved' && (
-                  <button 
-                    onClick={onCreateSubtask}
-                    style={{
-                      padding: '0.4rem 0.8rem',
-                      backgroundColor: 'transparent',
-                      color: '#3b82f6',
-                      border: '1px dashed #bfdbfe',
-                      borderRadius: '6px',
-                      fontSize: '0.8rem',
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                    }}
-                  >
-                    + Add Subtask
-                  </button>
-                )}
               </div>
             </div>
 
@@ -311,6 +375,10 @@ const TaskModal: React.FC<TaskModalProps> = ({ task: initialTask, onClose, onRef
             <p style={{ whiteSpace: 'pre-wrap', backgroundColor: '#f8fafc', padding: '1rem', borderRadius: '8px', margin: '1rem 0', color: '#334155', lineHeight: '1.6', border: '1px solid #e2e8f0' }}>
               {task.description}
             </p>
+
+            {task.attachments && task.attachments.length > 0 && (
+                <AttachmentList fileIds={task.attachments} title="Initial Attachments" />
+            )}
 
             {task.rejectionReason && (
               <div style={{ backgroundColor: '#fee2e2', color: '#991b1b', padding: '1rem', borderRadius: '8px', margin: '1rem 0', borderLeft: '4px solid #ef4444' }}>
@@ -329,12 +397,19 @@ const TaskModal: React.FC<TaskModalProps> = ({ task: initialTask, onClose, onRef
               </div>
               <div>
                 <div style={{ fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 600, marginBottom: '0.25rem' }}>Created By</div>
-                <div style={{ fontWeight: 500, color: '#0f172a' }}>{task.createdBy.name} <span style={{ color: '#64748b', fontSize: '0.85rem' }}>({task.createdBy.role})</span></div>
+                <div style={{ fontWeight: 500, color: '#0f172a' }}>{formatName(task.createdBy)}</div>
               </div>
               <div>
                 <div style={{ fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 600, marginBottom: '0.25rem' }}>Assigned To</div>
-                <div style={{ fontWeight: 500, color: '#0f172a' }}>{task.assignedTo ? <>{task.assignedTo.name} <span style={{ color: '#64748b', fontSize: '0.85rem' }}>({task.assignedTo.role})</span></> : <span style={{ color: '#94a3b8' }}>Unassigned</span>}</div>
+                <div style={{ fontWeight: 500, color: '#0f172a' }}>{formatName(task.assignedTo)}</div>
               </div>
+              
+              {task.delegatedTo && currentUser.role !== 'super_admin' && (
+                <div>
+                  <div style={{ fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 600, marginBottom: '0.25rem' }}>Delegated To</div>
+                  <div style={{ fontWeight: 500, color: '#0f172a' }}>{formatName(task.delegatedTo)}</div>
+                </div>
+              )}
               
               {task.workflowType && (
                 <div>
@@ -367,18 +442,84 @@ const TaskModal: React.FC<TaskModalProps> = ({ task: initialTask, onClose, onRef
               
               {canAssign && (
                 isAssigning ? (
-                  <div style={{ display: 'flex', gap: '0.5rem' }}>
-                    <select 
-                      className="form-control" 
-                      value={assignTarget} 
-                      onChange={(e) => setAssignTarget(e.target.value)}
-                    >
-                      <option value="">-- Unassigned --</option>
-                      {availableAssignees.map(a => (
-                        <option key={a.id} value={a.id}>{a.name} ({a.role})</option>
-                      ))}
-                    </select>
-                    <button className="btn btn-primary" onClick={handleAssign} disabled={loading}>Save Assignment</button>
+                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                    <div className="tm-assign-wrapper" ref={assignDropdownRef}>
+                      <div 
+                        className={`tm-custom-select ${isAssignDropdownOpen ? 'open' : ''}`}
+                        onClick={() => setIsAssignDropdownOpen(!isAssignDropdownOpen)}
+                      >
+                        {assignTarget ? (
+                          <span>{formatNameString(availableAssignees.find(a => a.id === assignTarget))}</span>
+                        ) : (
+                          <span style={{ color: '#94a3b8' }}>-- Unassigned --</span>
+                        )}
+                        <ChevronDown size={16} color="#64748b" />
+                      </div>
+                      
+                      {isAssignDropdownOpen && (
+                        <div className="tm-dropdown-menu">
+                          <div className="tm-dropdown-header">
+                            <div className="tm-dropdown-search">
+                              <Search size={14} className="tm-search-icon" />
+                              <input 
+                                type="text" 
+                                placeholder="Search users..." 
+                                value={assignSearchQuery}
+                                onChange={e => setAssignSearchQuery(e.target.value)}
+                                onClick={e => e.stopPropagation()}
+                                autoFocus
+                              />
+                            </div>
+                            {currentUser.role === 'super_admin' && (
+                              <div className="tm-role-filters">
+                                <button 
+                                  className={`tm-role-filter-btn ${assignRoleFilter === 'all' ? 'active' : ''}`}
+                                  onClick={(e) => { e.stopPropagation(); setAssignRoleFilter('all'); }}
+                                >All</button>
+                                <button 
+                                  className={`tm-role-filter-btn ${assignRoleFilter === 'department_admin' ? 'active' : ''}`}
+                                  onClick={(e) => { e.stopPropagation(); setAssignRoleFilter('department_admin'); }}
+                                >Admins</button>
+                                <button 
+                                  className={`tm-role-filter-btn ${assignRoleFilter === 'staff' ? 'active' : ''}`}
+                                  onClick={(e) => { e.stopPropagation(); setAssignRoleFilter('staff'); }}
+                                >Staff</button>
+                              </div>
+                            )}
+                          </div>
+                          
+                          <ul className="tm-dropdown-list">
+                            <li 
+                              className={`tm-dropdown-item ${!assignTarget ? 'selected' : ''}`}
+                              onClick={() => {
+                                setAssignTarget('');
+                                setIsAssignDropdownOpen(false);
+                              }}
+                            >
+                              <span>-- Unassigned --</span>
+                            </li>
+                            {getFilteredAssignees(assignSearchQuery, assignRoleFilter).length === 0 && (
+                              <li className="tm-dropdown-item empty">No users found</li>
+                            )}
+                            {getFilteredAssignees(assignSearchQuery, assignRoleFilter).map(a => (
+                              <li 
+                                key={a.id}
+                                className={`tm-dropdown-item ${assignTarget === a.id ? 'selected' : ''}`}
+                                onClick={() => {
+                                  setAssignTarget(a.id);
+                                  setIsAssignDropdownOpen(false);
+                                  setAssignSearchQuery('');
+                                }}
+                              >
+                                <span>{a.id === currentUser.id ? 'me' : a.name}</span>
+                                <span className="tm-assignee-role">(ID: {a.universityId || 'N/A'})</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                    <button className="btn btn-primary" onClick={handleAssign} disabled={loading} style={{ whiteSpace: 'nowrap' }}>Save Assignment</button>
                     <button className="btn btn-secondary" onClick={() => setIsAssigning(false)}>Cancel</button>
                   </div>
                 ) : (
@@ -480,7 +621,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ task: initialTask, onClose, onRef
               {canReview && !isRejecting && (
                 <div style={{ display: 'flex', gap: '0.5rem', marginLeft: 'auto' }}>
                   <button className="btn btn-success" style={{ backgroundColor: '#10b981', color: 'white' }} onClick={() => handleReviewAction('approved')} disabled={loading}>
-                    {currentUser.role === 'department_admin' && task.reviewStage === 'department_admin' ? 'Approve & Send to Super Admin' : 'Approve'}
+                    {currentUser.role === 'department_admin' && task.reviewStage === 'department_admin' && (task.createdBy?._id !== currentUser.id && task.createdBy?.id !== currentUser.id) ? 'Approve & Send to Super Admin' : 'Approve'}
                   </button>
                   <button className="btn btn-danger" onClick={() => setIsRejecting(true)} disabled={loading}>Reject</button>
                 </div>
@@ -500,6 +641,10 @@ const TaskModal: React.FC<TaskModalProps> = ({ task: initialTask, onClose, onRef
                   </div>
                 </div>
               )}
+
+              {task.completionAttachments && task.completionAttachments.length > 0 && (
+                <AttachmentList fileIds={task.completionAttachments} title="Submitted Documents" />
+              )}
             </div>
 
             {/* Subtasks Section */}
@@ -507,53 +652,12 @@ const TaskModal: React.FC<TaskModalProps> = ({ task: initialTask, onClose, onRef
               <div style={{ marginTop: '2rem', borderTop: '1px solid #ddd', paddingTop: '1rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                   <h3>Subtasks</h3>
-                  {canAssign && task.status !== 'approved' && !isCreatingSubtask && (
-                    <button className="btn btn-primary" style={{ padding: '0.4rem 0.8rem', fontSize: '0.9rem' }} onClick={() => setIsCreatingSubtask(true)}>+ Add Subtask</button>
+                  {canAssign && task.status !== 'approved' && onCreateSubtask && (
+                    <button className="btn btn-primary" style={{ padding: '0.4rem 0.8rem', fontSize: '0.9rem' }} onClick={() => onCreateSubtask()}>+ Add Subtask</button>
                   )}
                 </div>
                 
-                {isCreatingSubtask && (
-                  <div style={{ backgroundColor: '#f8fafc', padding: '1rem', borderRadius: '6px', marginBottom: '1rem', border: '1px solid #e2e8f0' }}>
-                    <h4 style={{ margin: '0 0 1rem 0' }}>New Subtask</h4>
-                    <input 
-                      type="text" 
-                      placeholder="Title" 
-                      className="form-control" 
-                      style={{ marginBottom: '0.5rem' }}
-                      value={newSubtaskData.title}
-                      onChange={e => setNewSubtaskData({...newSubtaskData, title: e.target.value})}
-                    />
-                    <textarea 
-                      placeholder="Description" 
-                      className="form-control" 
-                      style={{ marginBottom: '0.5rem' }}
-                      value={newSubtaskData.description}
-                      onChange={e => setNewSubtaskData({...newSubtaskData, description: e.target.value})}
-                    />
-                    <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
-                      <input 
-                        type="datetime-local" 
-                        className="form-control" 
-                        value={newSubtaskData.deadline}
-                        onChange={e => setNewSubtaskData({...newSubtaskData, deadline: e.target.value})}
-                      />
-                      <select 
-                        className="form-control"
-                        value={newSubtaskData.assignedTo}
-                        onChange={e => setNewSubtaskData({...newSubtaskData, assignedTo: e.target.value})}
-                      >
-                        <option value="">-- Assign To --</option>
-                        {availableAssignees.map(a => (
-                          <option key={a.id} value={a.id}>{a.name} ({a.role})</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div style={{ display: 'flex', gap: '0.5rem' }}>
-                      <button className="btn btn-primary" onClick={handleCreateSubtask} disabled={loading}>Create</button>
-                      <button className="btn btn-secondary" onClick={() => setIsCreatingSubtask(false)}>Cancel</button>
-                    </div>
-                  </div>
-                )}
+
 
                 {subtasks.length === 0 ? (
                   <p style={{ color: '#888', fontStyle: 'italic' }}>No subtasks created yet.</p>
@@ -566,7 +670,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ task: initialTask, onClose, onRef
                           <span style={{ fontSize: '0.8rem', fontWeight: 'bold' }}>{st.status.replace(/_/g, ' ').toUpperCase()}</span>
                         </div>
                         <div style={{ fontSize: '0.85rem', color: '#475569', display: 'flex', justifyContent: 'space-between' }}>
-                          <span>Assigned: {st.assignedTo ? st.assignedTo.name : 'Unassigned'}</span>
+                          <span>Assigned: {formatNameString(st.delegatedTo || st.assignedTo)}</span>
                           <span>Due: {new Date(st.deadline).toLocaleDateString()}</span>
                         </div>
                       </div>
