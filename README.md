@@ -69,16 +69,6 @@ npm run dev
 
 The application will be accessible at `http://localhost:5173`.
 
-## 🔐 Default Test Credentials
-
-Use these pre-seeded credentials to explore the different roles in the system:
-
-| Role | University ID | Password |
-| :--- | :--- | :--- |
-| **Super Admin** | `10001` | `12345678` |
-| **Department Admin** | `10002` | `12345678` |
-| **Staff** | `10003` | `12345678` |
-
 ## 🏗️ Project Structure
 
 ```text
