@@ -3,6 +3,73 @@ import { History, Clock, UploadCloud, Plus, ArrowRight, ChevronDown, ArrowLeft, 
 import { api } from '../services/api';
 import './CreateTaskView.css';
 
+// Auto-compress image files to ~500KB max
+const compressImage = (file: File, maxSizeKB: number = 500): Promise<File> => {
+  return new Promise((resolve) => {
+    // Only compress image files
+    if (!file.type.startsWith('image/')) {
+      resolve(file);
+      return;
+    }
+    // If already small enough, skip
+    if (file.size <= maxSizeKB * 1024) {
+      resolve(file);
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let { width, height } = img;
+
+        // Scale down if very large
+        const maxDimension = 1920;
+        if (width > maxDimension || height > maxDimension) {
+          const ratio = Math.min(maxDimension / width, maxDimension / height);
+          width = Math.round(width * ratio);
+          height = Math.round(height * ratio);
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d')!;
+        ctx.drawImage(img, 0, 0, width, height);
+
+        // Try progressively lower quality
+        let quality = 0.8;
+        const tryCompress = () => {
+          canvas.toBlob(
+            (blob) => {
+              if (!blob) { resolve(file); return; }
+              if (blob.size > maxSizeKB * 1024 && quality > 0.1) {
+                quality -= 0.1;
+                tryCompress();
+              } else {
+                const compressed = new File([blob], file.name, {
+                  type: 'image/jpeg',
+                  lastModified: Date.now(),
+                });
+                resolve(compressed);
+              }
+            },
+            'image/jpeg',
+            quality
+          );
+        };
+        tryCompress();
+      };
+      img.src = e.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  });
+};
+
+const compressFiles = async (files: File[]): Promise<File[]> => {
+  return Promise.all(files.map(f => compressImage(f)));
+};
+
 interface CreateTaskViewProps {
   onSubmit: (taskData: any) => Promise<void>;
   onCancel: () => void;
@@ -392,7 +459,7 @@ const CreateTaskView: React.FC<CreateTaskViewProps> = ({ onSubmit, onCancel, ava
             <div className="ct-input-group">
               <label className="ct-label">DEADLINE</label>
               <input 
-                type="date" 
+                type="datetime-local" 
                 className="ct-date" 
                 required
                 value={tasksToCreate[activeTab].deadline}
@@ -429,12 +496,14 @@ const CreateTaskView: React.FC<CreateTaskViewProps> = ({ onSubmit, onCancel, ava
               multiple 
               style={{ display: 'none' }} 
               ref={fileInputRef}
-              onChange={(e) => {
+              onChange={async (e) => {
                 if (e.target.files) {
+                  const rawFiles = Array.from(e.target.files!);
+                  const compressed = await compressFiles(rawFiles);
                   setTasksToCreate(prev => {
                     const n = [...prev];
                     const task = { ...n[activeTab] };
-                    task.files = Array.from(e.target.files!);
+                    task.files = compressed;
                     n[activeTab] = task;
                     return n;
                   });

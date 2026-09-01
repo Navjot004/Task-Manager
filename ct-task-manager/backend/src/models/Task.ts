@@ -20,6 +20,7 @@ export interface ITask extends Document {
   attachments: mongoose.Types.ObjectId[];
   completionAttachments: mongoose.Types.ObjectId[];
   requiredCompletionExtensions: string[];
+  completedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -116,7 +117,11 @@ const taskSchema = new Schema<ITask>(
     requiredCompletionExtensions: [{
       type: String,
       default: []
-    }]
+    }],
+    completedAt: {
+      type: Date,
+      default: null
+    }
   },
   {
     timestamps: true,

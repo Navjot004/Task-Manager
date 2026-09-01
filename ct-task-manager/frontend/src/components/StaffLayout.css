@@ -102,6 +102,8 @@
   border-top: 1px solid #e2e8f0;
   font-size: 0.75rem;
   color: #64748b;
+  margin-top: auto;
+  flex-shrink: 0;
 }
 
 /* Main Content Area */
@@ -110,7 +112,9 @@
   display: flex;
   flex-direction: column;
   height: 100vh;
+  max-height: 100vh;
   overflow: hidden;
+  min-width: 0;
 }
 
 /* Topbar */

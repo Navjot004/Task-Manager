@@ -1,18 +1,24 @@
 .dept-admin-layout {
   display: flex;
-  min-height: 100vh;
+  height: 100vh;
+  max-height: 100vh;
+  width: 100vw;
+  overflow: hidden;
   background-color: #f8fafc;
 }
 
 /* Sidebar */
 .dept-sidebar {
   width: 260px;
+  height: 100vh;
+  max-height: 100vh;
   background-color: #f1f5f9;
   border-right: 1px solid #e2e8f0;
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
   transition: all 0.3s ease;
+  z-index: 10;
 }
 
 .dept-sidebar-header {
@@ -21,6 +27,7 @@
   align-items: center;
   padding: 0 1.5rem;
   border-bottom: 1px solid #e2e8f0;
+  flex-shrink: 0;
 }
 
 .dept-sidebar-brand {
@@ -89,6 +96,8 @@
 .dept-sidebar-footer {
   padding: 1rem;
   border-top: 1px solid #e2e8f0;
+  margin-top: auto;
+  flex-shrink: 0;
 }
 
 .dept-nav-item.logout {
@@ -102,9 +111,12 @@
 /* Main Content */
 .dept-main {
   flex: 1;
+  height: 100vh;
+  max-height: 100vh;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  min-width: 0;
 }
 
 /* Top Navbar */

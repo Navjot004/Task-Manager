@@ -384,7 +384,7 @@ export const api = {
     return json;
   },
 
-  getTasks: async (params: { page?: number; limit?: number; search?: string; status?: string; assignee?: string; sortBy?: string; workflow?: string; reviewStage?: string; taskType?: string }): Promise<{ success: boolean; data: { tasks: any[]; pagination: Pagination } }> => {
+  getTasks: async (params: { page?: number; limit?: number; search?: string; status?: string; assignee?: string; sortBy?: string; workflow?: string; reviewStage?: string; taskType?: string; department?: string }): Promise<{ success: boolean; data: { tasks: any[]; pagination: Pagination } }> => {
     const query = new URLSearchParams();
     if (params.page) query.set('page', String(params.page));
     if (params.limit) query.set('limit', String(params.limit));
@@ -395,6 +395,7 @@ export const api = {
     if (params.workflow) query.set('workflow', params.workflow);
     if (params.reviewStage) query.set('reviewStage', params.reviewStage);
     if (params.taskType) query.set('taskType', params.taskType);
+    if (params.department) query.set('department', params.department);
 
     return fetchWithAuth(`/api/tasks?${query.toString()}`);
   },

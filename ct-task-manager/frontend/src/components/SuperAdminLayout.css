@@ -1,6 +1,8 @@
 .sa-layout-container {
   display: flex;
   height: 100vh;
+  max-height: 100vh;
+  width: 100vw;
   background-color: #f8fafc;
   font-family: 'Inter', sans-serif;
   color: #1e293b;
@@ -10,6 +12,8 @@
 /* Sidebar (Desktop) */
 .sa-sidebar {
   width: 260px;
+  height: 100vh;
+  max-height: 100vh;
   background-color: #f1f5f9;
   border-right: 1px solid #e2e8f0;
   display: flex;
@@ -89,6 +93,8 @@
 .sa-sidebar-footer {
   padding: 1rem;
   border-top: 1px solid #e2e8f0;
+  margin-top: auto;
+  flex-shrink: 0;
 }
 
 .sa-logout-btn {
@@ -108,9 +114,12 @@
 /* Main Content Area */
 .sa-main-content {
   flex: 1;
+  height: 100vh;
+  max-height: 100vh;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  min-width: 0;
 }
 
 /* Topbar */

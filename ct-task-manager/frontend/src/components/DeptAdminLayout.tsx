@@ -4,14 +4,11 @@ import {
   LayoutDashboard, 
   CheckSquare, 
   Users, 
-  Building, 
-  Settings, 
   Search, 
   Bell, 
-  LogOut,
-  Menu,
-  X,
-  ShieldHalf
+  LogOut, 
+  Menu, 
+  ShieldHalf 
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import './DeptAdminLayout.css';
@@ -30,7 +27,6 @@ const DeptAdminLayout: React.FC = () => {
     { to: "/admin", icon: <LayoutDashboard size={20} />, label: "Dashboard", end: true },
     { to: "/admin/tasks", icon: <CheckSquare size={20} />, label: "Team Tasks" },
     { to: "/admin/staff", icon: <Users size={20} />, label: "Manage Team" },
-    { to: "/admin/settings", icon: <Settings size={20} />, label: "Settings" },
   ];
 
   return (
@@ -111,8 +107,12 @@ const DeptAdminLayout: React.FC = () => {
 
             <div className="dept-user-profile">
               <div className="dept-user-info">
-                <div className="dept-user-name" style={{ whiteSpace: 'nowrap' }}>{user?.name}</div>
-                <div className="dept-user-role">Department Admin</div>
+                <div className="dept-user-name" style={{ whiteSpace: 'nowrap' }}>
+                  {user?.name} {user?.universityId ? `(${user.universityId})` : ''}
+                </div>
+                <div className="dept-user-role" style={{ whiteSpace: 'nowrap' }}>
+                  Department Admin : {user?.department || 'School of Engineering and Technology'}
+                </div>
               </div>
               <div 
                 className="dept-user-avatar"

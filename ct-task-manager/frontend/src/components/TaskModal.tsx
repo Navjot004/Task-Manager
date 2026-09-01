@@ -1,8 +1,65 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Search, ChevronDown } from 'lucide-react';
 import { api } from '../services/api';
-import { calculateUrgency, getUrgencyBadgeClass, getUrgencyColor, getUrgencyLabel } from '../utils/taskUrgency';
+import { calculateUrgency, getUrgencyColor, getUrgencyLabel } from '../utils/taskUrgency';
 import './TaskModal.css';
+
+// Auto-compress image files to ~500KB max
+const compressImage = (file: File, maxSizeKB: number = 500): Promise<File> => {
+  return new Promise((resolve) => {
+    if (!file.type.startsWith('image/')) { resolve(file); return; }
+    if (file.size <= maxSizeKB * 1024) { resolve(file); return; }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let { width, height } = img;
+        const maxDim = 1920;
+        if (width > maxDim || height > maxDim) {
+          const ratio = Math.min(maxDim / width, maxDim / height);
+          width = Math.round(width * ratio);
+          height = Math.round(height * ratio);
+        }
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d')!;
+        ctx.drawImage(img, 0, 0, width, height);
+        let quality = 0.8;
+        const tryCompress = () => {
+          canvas.toBlob((blob) => {
+            if (!blob) { resolve(file); return; }
+            if (blob.size > maxSizeKB * 1024 && quality > 0.1) {
+              quality -= 0.1;
+              tryCompress();
+            } else {
+              resolve(new File([blob], file.name, { type: 'image/jpeg', lastModified: Date.now() }));
+            }
+          }, 'image/jpeg', quality);
+        };
+        tryCompress();
+      };
+      img.src = e.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  });
+};
+
+const compressFiles = async (files: File[]): Promise<File[]> => {
+  return Promise.all(files.map(f => compressImage(f)));
+};
+
+// Date format helper
+const formatDateTimeDDMMYYYY = (dateString: string) => {
+  const d = new Date(dateString);
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const year = d.getFullYear();
+  const hours = String(d.getHours()).padStart(2, '0');
+  const mins = String(d.getMinutes()).padStart(2, '0');
+  return `${day}/${month}/${year}, ${hours}:${mins}`;
+};
 
 interface TaskModalProps {
   task: any | null;
@@ -316,7 +373,6 @@ const TaskModal: React.FC<TaskModalProps> = ({ task: initialTask, onClose, onRef
   };
 
   const urgency = calculateUrgency(task.deadline);
-  const badgeClass = getUrgencyBadgeClass(urgency);
 
   const getStatusColor = (status: string) => {
     switch(status) {
@@ -393,7 +449,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ task: initialTask, onClose, onRef
               </div>
               <div>
                 <div style={{ fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 600, marginBottom: '0.25rem' }}>Deadline</div>
-                <div style={{ fontWeight: 500, color: '#0f172a' }}>{new Date(task.deadline).toLocaleString()}</div>
+                <div style={{ fontWeight: 500, color: '#0f172a' }}>{formatDateTimeDDMMYYYY(task.deadline)}</div>
               </div>
               <div>
                 <div style={{ fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 600, marginBottom: '0.25rem' }}>Created By</div>
@@ -433,6 +489,58 @@ const TaskModal: React.FC<TaskModalProps> = ({ task: initialTask, onClose, onRef
                     ))}
                   </div>
                 </div>
+              )}
+              
+              {/* Completion Date & Timeline Info */}
+              {(task.status === 'completed' || task.status === 'approved') && (
+                <>
+                  {task.completedAt && (
+                    <div>
+                      <div style={{ fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 600, marginBottom: '0.25rem' }}>Completion Date</div>
+                      <div style={{ fontWeight: 500, color: '#0f172a' }}>{formatDateTimeDDMMYYYY(task.completedAt)}</div>
+                    </div>
+                  )}
+                  {task.completedAt && (() => {
+                    const completedDate = new Date(task.completedAt);
+                    const deadlineDate = new Date(task.deadline);
+                    const diffTime = deadlineDate.getTime() - completedDate.getTime();
+                    const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+                    let timelineText = '';
+                    let timelineColor = '';
+                    let timelineIcon = '';
+                    if (diffDays > 0) {
+                      timelineText = `${diffDays} day${diffDays !== 1 ? 's' : ''} before deadline`;
+                      timelineColor = '#10b981';
+                      timelineIcon = '✅';
+                    } else if (diffDays < 0) {
+                      timelineText = `${Math.abs(diffDays)} day${Math.abs(diffDays) !== 1 ? 's' : ''} overdue`;
+                      timelineColor = '#ef4444';
+                      timelineIcon = '⚠️';
+                    } else {
+                      timelineText = 'Completed on deadline';
+                      timelineColor = '#f59e0b';
+                      timelineIcon = '✅';
+                    }
+                    return (
+                      <div style={{ gridColumn: '1 / -1' }}>
+                        <div style={{ 
+                          display: 'inline-flex', 
+                          alignItems: 'center', 
+                          gap: '0.4rem',
+                          padding: '0.4rem 0.75rem', 
+                          borderRadius: '6px', 
+                          fontSize: '0.85rem', 
+                          fontWeight: 600,
+                          backgroundColor: timelineColor + '15',
+                          color: timelineColor,
+                          border: `1px solid ${timelineColor}30`
+                        }}>
+                          {timelineIcon} {timelineText}
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </>
               )}
               
             </div>
@@ -554,11 +662,13 @@ const TaskModal: React.FC<TaskModalProps> = ({ task: initialTask, onClose, onRef
                             ref={reviewFileInputRef}
                             style={{ display: 'none' }}
                             accept={task.requiredCompletionExtensions?.length ? task.requiredCompletionExtensions.join(',') : undefined}
-                            onChange={(e) => {
+                            onChange={async (e) => {
                               if (e.target.files) {
                                 const selected = Array.from(e.target.files);
+                                // Auto-compress images
+                                const compressed = await compressFiles(selected);
                                 if (task.requiredCompletionExtensions?.length) {
-                                  const invalid = selected.filter(f => {
+                                  const invalid = compressed.filter(f => {
                                     const parts = f.name.split('.');
                                     if (parts.length < 2) return true;
                                     const ext = '.' + parts.pop()?.toLowerCase();
@@ -571,7 +681,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ task: initialTask, onClose, onRef
                                   }
                                 }
                                 setFileError('');
-                                setReviewFiles(selected);
+                                setReviewFiles(compressed);
                               }
                             }}
                           />
@@ -671,7 +781,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ task: initialTask, onClose, onRef
                         </div>
                         <div style={{ fontSize: '0.85rem', color: '#475569', display: 'flex', justifyContent: 'space-between' }}>
                           <span>Assigned: {formatNameString(st.delegatedTo || st.assignedTo)}</span>
-                          <span>Due: {new Date(st.deadline).toLocaleDateString()}</span>
+                          <span>Due: {formatDateTimeDDMMYYYY(st.deadline)}</span>
                         </div>
                       </div>
                     ))}

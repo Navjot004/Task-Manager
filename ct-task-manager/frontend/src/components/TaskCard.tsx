@@ -49,12 +49,41 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, currentUser, onClick, onCreat
     statusText = 'Rejected';
   }
 
+  // Format date to dd/mm/yyyy
+  const formatDateDDMMYYYY = (dateString: string) => {
+    const d = new Date(dateString);
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    return `${day}/${month}/${year}`;
+  };
+
+
+  // Get completion timeline info
+  const getCompletionTimeline = () => {
+    if (!isCompleted) return null;
+    const completedDate = task.completedAt ? new Date(task.completedAt) : null;
+    const deadlineDate = new Date(task.deadline);
+    if (!completedDate) return null;
+
+    const diffTime = deadlineDate.getTime() - completedDate.getTime();
+    const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDays > 0) {
+      return { text: `${diffDays} day${diffDays !== 1 ? 's' : ''} before deadline`, color: '#10b981', icon: '✅' };
+    } else if (diffDays < 0) {
+      return { text: `${Math.abs(diffDays)} day${Math.abs(diffDays) !== 1 ? 's' : ''} overdue`, color: '#ef4444', icon: '⚠️' };
+    } else {
+      return { text: 'Completed on deadline', color: '#f59e0b', icon: '✅' };
+    }
+  };
+
+  const completionTimeline = getCompletionTimeline();
+
   // Format deadline for UI
   const formatDeadline = (dateString: string) => {
     if (isCompleted) {
-       // Ideally we'd have a completedAt date, fallback to deadline or just 'Completed'
-       const date = new Date(dateString);
-       return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+       return formatDateDDMMYYYY(dateString);
     }
     
     const deadline = new Date(dateString);
@@ -166,6 +195,19 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, currentUser, onClick, onCreat
             {isCompleted ? <CheckCircle2 size={14} /> : <Calendar size={14} className={isOverdue ? "text-red-500" : ""} />}
             {formatDeadline(task.deadline)}
           </div>
+          {completionTimeline && (
+            <div style={{ 
+              fontSize: '0.65rem', 
+              fontWeight: 600, 
+              color: completionTimeline.color, 
+              marginTop: '0.25rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.2rem'
+            }}>
+              {completionTimeline.icon} {completionTimeline.text}
+            </div>
+          )}
         </div>
       </div>
     </div>

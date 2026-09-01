@@ -3,12 +3,10 @@ import { NavLink, Outlet } from 'react-router-dom';
 import { 
   LayoutDashboard, 
   CheckSquare, 
-  Settings, 
   Search, 
   Bell, 
   Shield,
-  Menu,
-  X
+  Menu
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import './StaffLayout.css';
@@ -20,7 +18,6 @@ const StaffLayout: React.FC = () => {
   const navLinks = [
     { to: "/staff", icon: <LayoutDashboard size={20} />, label: "Dashboard", end: true },
     { to: "/staff/tasks", icon: <CheckSquare size={20} />, label: "My Tasks" },
-    { to: "/staff/settings", icon: <Settings size={20} />, label: "Settings" },
   ];
 
   return (
@@ -87,9 +84,13 @@ const StaffLayout: React.FC = () => {
             </div>
 
             <div className="staff-user-profile">
-              <div className="staff-user-info">
-                <div className="staff-user-name">{user?.name}</div>
-                <div className="staff-user-role">Faculty Admin</div>
+              <div className="staff-user-info" style={{ textAlign: 'right' }}>
+                <div className="staff-user-name" style={{ whiteSpace: 'nowrap' }}>
+                  {user?.name} {user?.universityId ? `(${user.universityId})` : ''}
+                </div>
+                <div className="staff-user-role" style={{ whiteSpace: 'nowrap' }}>
+                  Staff : {user?.department || 'School of Engineering and Technology'}
+                </div>
               </div>
               <div 
                 className="staff-user-avatar"

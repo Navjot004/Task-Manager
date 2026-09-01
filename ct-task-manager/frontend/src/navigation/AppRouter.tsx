@@ -64,7 +64,6 @@ const AppRouter = () => {
           }>
             <Route index element={<StaffPage />} />
             <Route path="tasks" element={<TasksPage />} />
-            <Route path="settings" element={<div>Settings Work In Progress</div>} />
           </Route>
         </Routes>
       </BrowserRouter>

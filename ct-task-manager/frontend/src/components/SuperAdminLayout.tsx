@@ -132,8 +132,12 @@ const SuperAdminLayout: React.FC = () => {
             </button>
             <div className="sa-user-profile">
               <div className="sa-user-info">
-                <span className="sa-user-name">{currentUser.name || 'Dr. Admin'}</span>
-                <span className="sa-user-role">Super Admin</span>
+                <span className="sa-user-name">
+                  {currentUser.name || 'Admin'} {currentUser.universityId ? `(${currentUser.universityId})` : ''}
+                </span>
+                <span className="sa-user-role">
+                  Super Admin{currentUser.department ? ` : ${currentUser.department}` : ''}
+                </span>
               </div>
               {/* Fallback avatar if no image */}
               <div className="sa-user-avatar" style={{

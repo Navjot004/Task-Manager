@@ -50,6 +50,23 @@ const SuperAdminPage = () => {
   const [tasksAwaitingReview, setTasksAwaitingReview] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Department/School filter
+  const [departments, setDepartments] = useState<any[]>([]);
+  const [selectedDept, setSelectedDept] = useState<string>('All');
+  const [isDeptDropdownOpen, setIsDeptDropdownOpen] = useState(false);
+  const deptDropdownRef = React.useRef<HTMLDivElement>(null);
+
+  // Close dropdown on outside click
+  React.useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (deptDropdownRef.current && !deptDropdownRef.current.contains(e.target as Node)) {
+        setIsDeptDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
+
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
@@ -74,12 +91,22 @@ const SuperAdminPage = () => {
           overdue: 0 // Placeholder
         });
 
+        // Fetch Departments
+        try {
+          const deptRes = await api.getDepartments();
+          if (deptRes.success) {
+            setDepartments(deptRes.data.departments || []);
+          }
+        } catch (e) {
+          console.error('Failed to fetch departments:', e);
+        }
+
         // Fetch Tasks Awaiting Review
         const reviewRes = await api.getTasks({ limit: 5, status: 'submitted_for_review' });
         setTasksAwaitingReview(reviewRes.data.tasks);
 
-        // Fetch Recent Activity (Latest tasks)
-        const recentRes = await api.getTasks({ limit: 5 });
+        // Fetch Recent Activity (Latest tasks — fetch more so filter has enough to show)
+        const recentRes = await api.getTasks({ limit: 50 });
         setRecentTasks(recentRes.data.tasks);
 
       } catch (error) {
@@ -120,9 +147,22 @@ const SuperAdminPage = () => {
   };
 
   const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const d = new Date(dateString);
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    const hours = String(d.getHours()).padStart(2, '0');
+    const mins = String(d.getMinutes()).padStart(2, '0');
+    return `${day}/${month}/${year}, ${hours}:${mins}`;
   };
+
+  // Filter recent tasks by department
+  const filteredRecentTasks = selectedDept === 'All'
+    ? recentTasks.slice(0, 10)
+    : recentTasks.filter(t => {
+        const assigneeDept = t.assignedTo?.department || t.delegatedTo?.department;
+        return assigneeDept === selectedDept;
+      }).slice(0, 10);
 
   return (
     <div className="sa-dashboard-container">
@@ -271,8 +311,81 @@ const SuperAdminPage = () => {
         <div className="sa-activity-card">
           <div className="sa-activity-header">
             <h2 className="sa-activity-title">Recent Activity</h2>
-            <div className="sa-activity-actions">
-              <button className="sa-icon-btn" onClick={() => navigate('/super-admin/tasks')}><Filter size={16} /></button>
+            <div className="sa-activity-actions" ref={deptDropdownRef} style={{ position: 'relative' }}>
+              <button 
+                className="sa-icon-btn" 
+                onClick={() => setIsDeptDropdownOpen(!isDeptDropdownOpen)}
+                style={{ 
+                  width: 'auto', 
+                  padding: '0.4rem 0.6rem', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '0.4rem',
+                  backgroundColor: selectedDept !== 'All' ? '#e0e7ff' : '#f1f5f9',
+                  color: selectedDept !== 'All' ? '#3730a3' : '#475569',
+                  fontWeight: selectedDept !== 'All' ? 600 : 400,
+                  fontSize: '0.8rem',
+                  borderRadius: '6px'
+                }}
+              >
+                <Filter size={14} />
+                {selectedDept !== 'All' ? selectedDept : 'School'}
+                <ChevronDown size={14} style={{ transform: isDeptDropdownOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+              </button>
+              
+              {isDeptDropdownOpen && (
+                <div style={{
+                  position: 'absolute',
+                  top: '100%',
+                  right: 0,
+                  marginTop: '0.4rem',
+                  width: '220px',
+                  maxHeight: '280px',
+                  overflowY: 'auto',
+                  backgroundColor: '#ffffff',
+                  borderRadius: '8px',
+                  boxShadow: '0 8px 30px rgba(0,0,0,0.12)',
+                  border: '1px solid #e2e8f0',
+                  zIndex: 100,
+                  padding: '0.4rem 0'
+                }}>
+                  <div 
+                    style={{ 
+                      padding: '0.5rem 1rem', 
+                      cursor: 'pointer', 
+                      fontSize: '0.85rem',
+                      fontWeight: selectedDept === 'All' ? 600 : 400,
+                      color: selectedDept === 'All' ? '#3730a3' : '#334155',
+                      backgroundColor: selectedDept === 'All' ? '#e0e7ff' : 'transparent',
+                      transition: 'background-color 0.15s'
+                    }}
+                    onClick={() => { setSelectedDept('All'); setIsDeptDropdownOpen(false); }}
+                    onMouseEnter={e => (e.currentTarget.style.backgroundColor = selectedDept === 'All' ? '#e0e7ff' : '#f8fafc')}
+                    onMouseLeave={e => (e.currentTarget.style.backgroundColor = selectedDept === 'All' ? '#e0e7ff' : 'transparent')}
+                  >
+                    All Schools
+                  </div>
+                  {departments.map(dept => (
+                    <div 
+                      key={dept._id}
+                      style={{ 
+                        padding: '0.5rem 1rem', 
+                        cursor: 'pointer', 
+                        fontSize: '0.85rem',
+                        fontWeight: selectedDept === dept.name ? 600 : 400,
+                        color: selectedDept === dept.name ? '#3730a3' : '#334155',
+                        backgroundColor: selectedDept === dept.name ? '#e0e7ff' : 'transparent',
+                        transition: 'background-color 0.15s'
+                      }}
+                      onClick={() => { setSelectedDept(dept.name); setIsDeptDropdownOpen(false); }}
+                      onMouseEnter={e => (e.currentTarget.style.backgroundColor = selectedDept === dept.name ? '#e0e7ff' : '#f8fafc')}
+                      onMouseLeave={e => (e.currentTarget.style.backgroundColor = selectedDept === dept.name ? '#e0e7ff' : 'transparent')}
+                    >
+                      {dept.name}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
@@ -287,8 +400,8 @@ const SuperAdminPage = () => {
                 </tr>
               </thead>
               <tbody>
-                {recentTasks.length > 0 ? (
-                  recentTasks.map(task => {
+                {filteredRecentTasks.length > 0 ? (
+                  filteredRecentTasks.map(task => {
                     const urgency = calculateUrgency(task.deadline);
                     const cardStyle = getUrgencyCardStyle(urgency);
                     
@@ -317,7 +430,9 @@ const SuperAdminPage = () => {
                   })
                 ) : (
                   <tr>
-                    <td colSpan={4} style={{ textAlign: 'center', color: '#64748b' }}>No recent tasks found.</td>
+                    <td colSpan={4} style={{ textAlign: 'center', color: '#64748b' }}>
+                      {selectedDept !== 'All' ? `No tasks found for ${selectedDept}` : 'No recent tasks found.'}
+                    </td>
                   </tr>
                 )}
               </tbody>

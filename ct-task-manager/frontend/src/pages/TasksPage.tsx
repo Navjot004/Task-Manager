@@ -5,6 +5,7 @@ import TaskCard from '../components/TaskCard';
 import TaskModal from '../components/TaskModal';
 import CreateTaskView from '../components/CreateTaskView';
 import { Search, Plus } from 'lucide-react';
+import { calculateUrgency } from '../utils/taskUrgency';
 import './TasksPage.css';
 
 const TasksPage: React.FC = () => {
@@ -21,10 +22,12 @@ const TasksPage: React.FC = () => {
   const [totalPages, setTotalPages] = useState(1);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
-  const [sortByFilter, setSortByFilter] = useState('default');
-  const [workflowFilter, setWorkflowFilter] = useState('All');
-  const [reviewStageFilter, setReviewStageFilter] = useState('All');
-  const [taskTypeFilter, setTaskTypeFilter] = useState('All'); // Changed default to 'All' to match mockups
+  const [priorityFilter, setPriorityFilter] = useState('All'); // Color/Priority filter
+  const [schoolFilter, setSchoolFilter] = useState('All');     // Department/School filter
+  const [taskTypeFilter, setTaskTypeFilter] = useState('All');
+  
+  // Departments list for school filter
+  const [departments, setDepartments] = useState<any[]>([]);
   
   // Available Assignees (for Dept Admin & Super Admin)
   const [availableAssignees, setAvailableAssignees] = useState<any[]>([]);
@@ -40,13 +43,11 @@ const TasksPage: React.FC = () => {
       setError('');
       const res = await api.getTasks({
         page,
-        limit: 12,
+        limit: 50, // Fetch a larger batch to support client-side priority/sorting
         search,
         status: statusFilter !== 'All' ? statusFilter : undefined,
-        sortBy: sortByFilter !== 'default' ? sortByFilter : undefined,
-        workflow: workflowFilter !== 'All' ? workflowFilter : undefined,
-        reviewStage: reviewStageFilter !== 'All' ? reviewStageFilter : undefined,
         taskType: taskTypeFilter !== 'All' ? taskTypeFilter : undefined,
+        department: schoolFilter !== 'All' ? schoolFilter : undefined,
       });
       setTasks(res.data.tasks);
       setTotalPages(res.data.pagination.totalPages);
@@ -73,7 +74,7 @@ const TasksPage: React.FC = () => {
   };
 
   const loadAssignees = async () => {
-    if (user?.role === 'staff') return; // Staff cannot assign
+    if (user?.role === 'staff') return;
     
     try {
       if (user?.role === 'super_admin') {
@@ -89,10 +90,23 @@ const TasksPage: React.FC = () => {
     }
   };
 
+  const loadDepartments = async () => {
+    if (user?.role !== 'super_admin') return;
+    try {
+      const res = await api.getDepartments();
+      if (res.success) {
+        setDepartments(res.data.departments || []);
+      }
+    } catch (err) {
+      console.error('Failed to load departments', err);
+    }
+  };
+
   useEffect(() => {
     if (user) {
       loadAssignees();
       loadPendingCount();
+      loadDepartments();
     }
   }, [user]);
 
@@ -100,7 +114,56 @@ const TasksPage: React.FC = () => {
     if (user && !isCreatingTask) {
       loadTasks();
     }
-  }, [page, statusFilter, sortByFilter, workflowFilter, reviewStageFilter, taskTypeFilter, user, search, isCreatingTask]);
+  }, [page, statusFilter, schoolFilter, taskTypeFilter, user, search, isCreatingTask]);
+
+  // Client-side filtering & sorting
+  const getFilteredAndSortedTasks = () => {
+    let filtered = [...tasks];
+
+    // Priority/Color filter (client-side based on urgency calculation)
+    if (priorityFilter !== 'All') {
+      filtered = filtered.filter(t => {
+        const urgency = calculateUrgency(t.deadline);
+        return urgency === priorityFilter;
+      });
+    }
+
+    // School/Department filter fallback
+    if (schoolFilter !== 'All') {
+      filtered = filtered.filter(t => {
+        const dept = t.assignedTo?.department || t.delegatedTo?.department;
+        return dept === schoolFilter;
+      });
+    }
+
+    // Default sort: New + Incomplete first (newest createdAt first), then completed (latest completed first)
+    const completedStatuses = ['completed', 'approved'];
+    
+    filtered.sort((a, b) => {
+      const aCompleted = completedStatuses.includes(a.status);
+      const bCompleted = completedStatuses.includes(b.status);
+
+      // Incomplete tasks come before completed
+      if (!aCompleted && bCompleted) return -1;
+      if (aCompleted && !bCompleted) return 1;
+
+      // If both are completed: sort by completedAt or updatedAt/createdAt descending (latest completed first)
+      if (aCompleted && bCompleted) {
+        const aTime = a.completedAt ? new Date(a.completedAt).getTime() : new Date(a.updatedAt || a.createdAt).getTime();
+        const bTime = b.completedAt ? new Date(b.completedAt).getTime() : new Date(b.updatedAt || b.createdAt).getTime();
+        return bTime - aTime;
+      }
+
+      // If both are incomplete: sort by createdAt descending (newest tasks first)
+      const aCreated = new Date(a.createdAt).getTime();
+      const bCreated = new Date(b.createdAt).getTime();
+      return bCreated - aCreated;
+    });
+
+    return filtered;
+  };
+
+  const displayTasks = getFilteredAndSortedTasks();
 
   const handleCreateTaskSubmit = async (taskData: FormData | FormData[]) => {
     setError('');
@@ -115,7 +178,7 @@ const TasksPage: React.FC = () => {
       setCreatingSubtaskFor(null);
     } catch (err: any) {
       setError(err.message);
-      throw err; // rethrow for the CreateTaskView to catch and stop loading
+      throw err;
     }
   };
 
@@ -142,7 +205,6 @@ const TasksPage: React.FC = () => {
 
   return (
     <>
-      
       <div className="tasks-page-container" style={{ maxWidth: '1200px' }}>
         
         {/* Desktop Header */}
@@ -159,7 +221,7 @@ const TasksPage: React.FC = () => {
           )}
         </div>
 
-        {/* Mobile Filter Pills (Only visible on mobile via media queries ideally, but we'll show them inline for now) */}
+        {/* Mobile Filter Pills */}
         <div className="mobile-filter-pills d-md-none">
           <button className={`mobile-pill ${statusFilter === 'All' ? 'active' : ''}`} onClick={() => setStatusFilter('All')}>All Tasks</button>
           <button className={`mobile-pill ${statusFilter === 'pending' ? 'active' : ''}`} onClick={() => setStatusFilter('pending')}>Pending Action</button>
@@ -178,7 +240,7 @@ const TasksPage: React.FC = () => {
           </div>
         )}
 
-        {/* Desktop Filters Bar */}
+        {/* Desktop Filters Bar: Search | Color/Priority | School | Status | Type */}
         <div className="tasks-filters-bar">
           <div className="tasks-search-wrapper">
             <Search className="tasks-search-icon" size={18} />
@@ -191,34 +253,49 @@ const TasksPage: React.FC = () => {
             />
           </div>
           
+          {/* 1. Color / Priority Filter */}
+          <select 
+            className="tasks-filter-select" 
+            value={priorityFilter} 
+            onChange={e => { setPriorityFilter(e.target.value); setPage(1); }}
+          >
+            <option value="All">Priority: All</option>
+            <option value="RED">🔴 High Priority</option>
+            <option value="YELLOW">🟡 Medium Priority</option>
+            <option value="GREEN">🟢 Low Priority</option>
+            <option value="OVERDUE">⚫ Overdue</option>
+          </select>
+
+          {/* 2. School / Department Filter (Only for Super Admin) */}
+          {user?.role === 'super_admin' && (
+            <select 
+              className="tasks-filter-select" 
+              value={schoolFilter} 
+              onChange={e => { setSchoolFilter(e.target.value); setPage(1); }}
+            >
+              <option value="All">School: All</option>
+              {departments.map(dept => (
+                <option key={dept._id} value={dept.name}>{dept.name}</option>
+              ))}
+            </select>
+          )}
+
+          {/* 3. Status Filter */}
           <select className="tasks-filter-select" value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setPage(1); }}>
             <option value="All">Status: All</option>
             <option value="pending">Pending</option>
             <option value="in_progress">In Progress</option>
+            <option value="submitted_for_review">In Review</option>
             <option value="completed">Completed</option>
-            <option value="submitted_for_review">Submitted for Review</option>
             <option value="approved">Approved</option>
             <option value="rejected">Rejected</option>
           </select>
 
-          {/* Using reviewStageFilter as a proxy for "Urgency" for now in UI */}
-          <select className="tasks-filter-select" value={reviewStageFilter} onChange={e => { setReviewStageFilter(e.target.value); setPage(1); }}>
-            <option value="All">Urgency: All</option>
-            <option value="Pending Review">Needs Review</option>
-          </select>
-
+          {/* 4. Type Filter: Main / Subtask */}
           <select className="tasks-filter-select" value={taskTypeFilter} onChange={e => { setTaskTypeFilter(e.target.value); setPage(1); }}>
             <option value="All">Type: All</option>
             <option value="main">Main Task</option>
             <option value="subtask">Subtask</option>
-          </select>
-
-          <select className="tasks-filter-select" value={sortByFilter} onChange={e => { setSortByFilter(e.target.value); setPage(1); }}>
-            <option value="default">Sort: Default</option>
-            <option value="createdAt_desc">Newest First</option>
-            <option value="createdAt_asc">Oldest First</option>
-            <option value="title_asc">Title (A-Z)</option>
-            <option value="title_desc">Title (Z-A)</option>
           </select>
         </div>
 
@@ -226,14 +303,14 @@ const TasksPage: React.FC = () => {
 
         {loading ? (
           <p>Loading tasks...</p>
-        ) : tasks.length === 0 ? (
+        ) : displayTasks.length === 0 ? (
           <div className="card" style={{ textAlign: 'center', padding: '3rem 1rem' }}>
             <h3 style={{ color: '#666' }}>No tasks found</h3>
             <p>Try adjusting your filters or create a new task.</p>
           </div>
         ) : (
           <>
-            {/* Action Required Header for Desktop (Optional, but good if we have pending reviews) */}
+            {/* Action Required Header for Desktop */}
             {pendingReviewsCount !== null && pendingReviewsCount > 0 && statusFilter === 'All' && (
                <div style={{ marginBottom: '1rem', color: '#1e40af', fontWeight: 'bold' }}>
                   {pendingReviewsCount} tasks require your attention.
@@ -241,7 +318,7 @@ const TasksPage: React.FC = () => {
             )}
             
             <div className="tasks-grid">
-              {tasks.map(task => (
+              {displayTasks.map(task => (
                 <TaskCard 
                   key={task._id} 
                   task={task} 

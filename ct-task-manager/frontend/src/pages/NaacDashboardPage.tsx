@@ -56,11 +56,16 @@ const NaacDashboardPage: React.FC = () => {
   }, []);
 
   const totalDepts = data.length;
+  const activeDeptsCount = data.filter(d => d.totalTasksGiven > 0).length;
   const totalGiven = data.reduce((sum, d) => sum + d.totalTasksGiven, 0);
   const totalCompleted = data.reduce((sum, d) => sum + d.totalTasksCompleted, 0);
   const totalPending = data.reduce((sum, d) => sum + d.totalTasksPending, 0);
   const totalReview = data.reduce((sum, d) => sum + d.totalTasksInReview, 0);
   const overallRate = totalGiven > 0 ? ((totalCompleted / totalGiven) * 100).toFixed(1) : '0.0';
+
+  const totalUsers = data.reduce((sum, d) => sum + d.users.length, 0);
+  const activeUsers = data.reduce((sum, d) => sum + d.users.filter(u => u.tasksGiven > 0).length, 0);
+  const resourceUtilization = totalUsers > 0 ? ((activeUsers / totalUsers) * 100).toFixed(1) : '0.0';
 
   if (loading) return <div className="naac-loading">Loading NAAC Report...</div>;
   if (error) return <div className="naac-error">{error}</div>;
@@ -84,7 +89,6 @@ const NaacDashboardPage: React.FC = () => {
           <div className="naac-kpi-card">
             <div className="kpi-top">
               <div className="kpi-icon-box"><CheckCircle size={20} /></div>
-              <span className="kpi-badge positive">+4.2%</span>
             </div>
             <div className="kpi-bottom">
               <span className="kpi-label">Overall Completion</span>
@@ -95,7 +99,6 @@ const NaacDashboardPage: React.FC = () => {
           <div className="naac-kpi-card">
             <div className="kpi-top">
               <div className="kpi-icon-box orange"><ClipboardList size={20} /></div>
-              <span className="kpi-badge negative">-12</span>
             </div>
             <div className="kpi-bottom">
               <span className="kpi-label">Pending Tasks</span>
@@ -106,22 +109,20 @@ const NaacDashboardPage: React.FC = () => {
           <div className="naac-kpi-card">
             <div className="kpi-top">
               <div className="kpi-icon-box gray"><Building2 size={20} /></div>
-              <span className="kpi-badge neutral">All</span>
             </div>
             <div className="kpi-bottom">
               <span className="kpi-label">Active Departments</span>
-              <span className="kpi-value">{totalDepts}/{totalDepts}</span>
+              <span className="kpi-value">{activeDeptsCount}/{totalDepts}</span>
             </div>
           </div>
 
           <div className="naac-kpi-card">
             <div className="kpi-top">
               <div className="kpi-icon-box blue"><BarChart3 size={20} /></div>
-              <span className="kpi-badge positive">+1.8%</span>
             </div>
             <div className="kpi-bottom">
               <span className="kpi-label">Resource Utilization</span>
-              <span className="kpi-value">92.4%</span>
+              <span className="kpi-value">{resourceUtilization}%</span>
             </div>
           </div>
         </div>
