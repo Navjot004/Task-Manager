@@ -13,6 +13,7 @@ import SuperAdminDepartmentsPage from '../pages/SuperAdminDepartmentsPage';
 import DeptAdminStaffPage from '../pages/DeptAdminStaffPage';
 import TasksPage from '../pages/TasksPage';
 import NaacDashboardPage from '../pages/NaacDashboardPage';
+import ProfilePage from '../pages/ProfilePage';
 import { AuthProvider } from '../context/AuthContext';
 import ProtectedRoute from '../components/ProtectedRoute';
 import SuperAdminLayout from '../components/SuperAdminLayout';
@@ -41,6 +42,7 @@ const AppRouter = () => {
             <Route path="tasks" element={<TasksPage />} />
             <Route path="departments" element={<SuperAdminDepartmentsPage />} />
             <Route path="naac" element={<NaacDashboardPage />} />
+            <Route path="profile" element={<ProfilePage />} />
             <Route path="alerts" element={<div>Alerts Work In Progress</div>} />
             <Route path="more" element={<div>More Options</div>} />
           </Route>
@@ -54,6 +56,7 @@ const AppRouter = () => {
             <Route index element={<AdminPage />} />
             <Route path="staff" element={<DeptAdminStaffPage />} />
             <Route path="tasks" element={<TasksPage />} />
+            <Route path="profile" element={<ProfilePage />} />
           </Route>
 
           {/* Staff Routes */}
@@ -64,6 +67,7 @@ const AppRouter = () => {
           }>
             <Route index element={<StaffPage />} />
             <Route path="tasks" element={<TasksPage />} />
+            <Route path="profile" element={<ProfilePage />} />
           </Route>
         </Routes>
       </BrowserRouter>

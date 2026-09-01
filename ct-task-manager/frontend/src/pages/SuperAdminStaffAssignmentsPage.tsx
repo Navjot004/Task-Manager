@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { api, User, Department } from '../services/api';
 import './SuperAdminStaffAssignmentsPage.css';
-import { Building, ShieldCheck, Mail, Phone, ChevronRight } from 'lucide-react';
+import { Building, ShieldCheck, Mail, Phone } from 'lucide-react';
 
 const SuperAdminStaffAssignmentsPage: React.FC = () => {
   const [staff, setStaff] = useState<User[]>([]);

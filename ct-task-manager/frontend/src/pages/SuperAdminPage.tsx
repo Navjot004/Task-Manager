@@ -13,13 +13,12 @@ import {
   CheckCircle,
   AlertTriangle,
   Filter,
-  MoreVertical,
   ChevronDown,
   ArrowUp
 } from 'lucide-react';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
-import { calculateUrgency, getUrgencyCardStyle, getUrgencyLabel, getUrgencyColor } from '../utils/taskUrgency';
+import { calculateUrgency, getUrgencyCardStyle, getUrgencyColor } from '../utils/taskUrgency';
 import TaskModal from '../components/TaskModal';
 import './SuperAdminDashboard.css';
 
@@ -236,7 +235,6 @@ const SuperAdminPage = () => {
               tasksAwaitingReview.map(task => {
                 const urgency = calculateUrgency(task.deadline);
                 const cardStyle = getUrgencyCardStyle(urgency);
-                const urgencyLabel = getUrgencyLabel(urgency);
                 const urgencyColor = getUrgencyColor(urgency);
                 
                 return (

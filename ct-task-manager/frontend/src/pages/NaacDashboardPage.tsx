@@ -3,25 +3,40 @@ import { api } from '../services/api';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
 } from 'recharts';
-import { CheckCircle, ClipboardList, Building2, BarChart3, ChevronRight, ChevronUp } from 'lucide-react';
+import { 
+  CheckCircle, ClipboardList, Building2, BarChart3, ChevronRight, 
+  Trophy, Star, Crown, X, Shield
+} from 'lucide-react';
 import './NaacDashboardPage.css';
 
 interface UserReport {
   _id: string;
   name: string;
+  universityId?: string;
   role: string;
+  department?: string;
+  email?: string;
+  phone?: string;
   tasksGiven: number;
   tasksPending: number;
   tasksInReview: number;
   tasksCompleted: number;
+  totalRatings?: number;
+  averageRating?: number;
+  onTimeRate?: number;
+  rank?: number;
 }
 
 interface DepartmentReport {
   department: string;
+  code?: string;
   totalTasksGiven: number;
   totalTasksPending: number;
   totalTasksInReview: number;
   totalTasksCompleted: number;
+  totalRatings?: number;
+  averageRating?: number;
+  rank?: number;
   users: UserReport[];
   completionRate?: number;
 }
@@ -31,6 +46,7 @@ const NaacDashboardPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [expandedDept, setExpandedDept] = useState<string | null>(null);
+  const [selectedDeptModal, setSelectedDeptModal] = useState<DepartmentReport | null>(null);
 
   const toggleExpand = (dept: string) => {
     setExpandedDept(expandedDept === dept ? null : dept);
@@ -41,7 +57,7 @@ const NaacDashboardPage: React.FC = () => {
       try {
         setLoading(true);
         const res = await api.getNaacReport();
-        const processedData = res.data.map((d: DepartmentReport) => ({
+        const processedData = (res.data || []).map((d: DepartmentReport) => ({
           ...d,
           completionRate: d.totalTasksGiven > 0 ? Math.round((d.totalTasksCompleted / d.totalTasksGiven) * 100) : 0
         }));
@@ -67,7 +83,7 @@ const NaacDashboardPage: React.FC = () => {
   const activeUsers = data.reduce((sum, d) => sum + d.users.filter(u => u.tasksGiven > 0).length, 0);
   const resourceUtilization = totalUsers > 0 ? ((activeUsers / totalUsers) * 100).toFixed(1) : '0.0';
 
-  if (loading) return <div className="naac-loading">Loading NAAC Report...</div>;
+  if (loading) return <div className="naac-loading"><div className="naac-spinner" /><span>Loading NAAC Report & Leaderboard...</span></div>;
   if (error) return <div className="naac-error">{error}</div>;
 
   const getInitials = (name: string) => {
@@ -80,8 +96,10 @@ const NaacDashboardPage: React.FC = () => {
         
         {/* Header Section */}
         <div className="naac-header">
-          <h1>NAAC Reports Dashboard</h1>
-          <p>Comprehensive university-wide performance & compliance.</p>
+          <div>
+            <h1>NAAC Reports & Ratings Dashboard</h1>
+            <p>Comprehensive university-wide performance, department rankings & ratings.</p>
+          </div>
         </div>
 
         {/* KPI Grid Section */}
@@ -127,6 +145,76 @@ const NaacDashboardPage: React.FC = () => {
           </div>
         </div>
 
+        {/* Top Rated Departments Leaderboard Section */}
+        <div className="naac-section-card">
+          <div className="section-header-flex">
+            <div>
+              <h3 className="section-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Trophy size={20} color="#f59e0b" /> Top Rated Departments Leaderboard
+              </h3>
+              <p className="section-subtitle">Ranked by average star rating across all staff and department admins. Click any department to view staff ratings.</p>
+            </div>
+          </div>
+
+          <div className="naac-lb-grid">
+            {data.map((dept, index) => {
+              const rank = dept.rank || (index + 1);
+              const admin = dept.users.find(u => u.role === 'department_admin') || dept.users[0];
+              const avgRating = dept.averageRating || 0;
+              const totalRatings = dept.totalRatings || 0;
+
+              return (
+                <div 
+                  key={dept.department} 
+                  className={`naac-lb-card ${rank === 1 ? 'gold-card' : rank === 2 ? 'silver-card' : rank === 3 ? 'bronze-card' : ''}`}
+                  onClick={() => setSelectedDeptModal(dept)}
+                >
+                  <div className="naac-lb-card-header">
+                    <span className={`naac-rank-badge rank-${rank <= 3 ? rank : 'default'}`}>
+                      {rank === 1 ? '🥇 Rank #1' : rank === 2 ? '🥈 Rank #2' : rank === 3 ? '🥉 Rank #3' : `Rank #${rank}`}
+                    </span>
+                    <div className="naac-score-pill">
+                      <Star size={14} fill={avgRating > 0 ? '#eab308' : 'none'} color="#eab308" />
+                      <strong>{avgRating > 0 ? avgRating.toFixed(1) : '—'}</strong>
+                      <span>/ 5.0</span>
+                    </div>
+                  </div>
+
+                  <h4 className="naac-lb-dept-name">{dept.department}</h4>
+                  
+                  <div className="naac-lb-admin-line">
+                    <Shield size={13} />
+                    <span>Admin: <strong>{admin ? admin.name : 'Unassigned'}</strong></span>
+                  </div>
+
+                  <div className="naac-lb-stats-row">
+                    <div className="naac-lb-stat">
+                      <span className="naac-lb-stat-lbl">Staff</span>
+                      <span className="naac-lb-stat-num">{dept.users.length}</span>
+                    </div>
+                    <div className="naac-lb-stat">
+                      <span className="naac-lb-stat-lbl">Ratings</span>
+                      <span className="naac-lb-stat-num">{totalRatings}</span>
+                    </div>
+                    <div className="naac-lb-stat">
+                      <span className="naac-lb-stat-lbl">Completed</span>
+                      <span className="naac-lb-stat-num">{dept.totalTasksCompleted}</span>
+                    </div>
+                    <div className="naac-lb-stat">
+                      <span className="naac-lb-stat-lbl">Progress</span>
+                      <span className="naac-lb-stat-num">{dept.completionRate}%</span>
+                    </div>
+                  </div>
+
+                  <button className="naac-lb-view-btn">
+                    View Staff & Ratings <ChevronRight size={14} />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
         {/* Chart Section */}
         <div className="naac-section-card">
           <div className="section-header-flex">
@@ -134,7 +222,6 @@ const NaacDashboardPage: React.FC = () => {
               <h3 className="section-title">Task Progression & Completion Rate</h3>
               <p className="section-subtitle">Comparison across major university schools</p>
             </div>
-            {/* Legend handled by Recharts, but we can customize the position */}
           </div>
           
           <div style={{ width: '100%', height: 350, marginTop: '20px' }}>
@@ -151,7 +238,6 @@ const NaacDashboardPage: React.FC = () => {
                   axisLine={false} 
                   tickLine={false} 
                   tickFormatter={(val) => {
-                    // Shorten names for the X axis like the screenshot
                     if(val.includes('Engineering')) return 'ENGINEERING';
                     if(val.includes('Management')) return 'MANAGEMENT';
                     if(val.includes('Sciences')) return 'SCIENCES';
@@ -189,39 +275,37 @@ const NaacDashboardPage: React.FC = () => {
         <div className="naac-section-card">
           <div className="section-header-flex">
             <div>
-              <h3 className="section-title">Departmental Breakdown</h3>
-              <p className="section-subtitle">Detailed task status and progress per department.</p>
+              <h3 className="section-title">Departmental Breakdown & Task Metrics</h3>
+              <p className="section-subtitle">Detailed task status and staff distributions per department.</p>
             </div>
-            <button className="filter-btn">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg>
-              Filter
-            </button>
           </div>
 
           <div className="breakdown-table-container">
             <table className="breakdown-table">
               <thead>
                 <tr>
-                  <th>DEPARTMENT & ADMIN</th>
+                  <th>RANK & DEPARTMENT</th>
+                  <th className="text-center">AVG RATING</th>
                   <th className="text-center">TOTAL TASKS</th>
                   <th>STATUS DISTRIBUTION</th>
                   <th className="text-center">OVERALL PROGRESS</th>
-                  <th className="text-center">ACTIONS</th>
+                  <th className="text-center">DETAILS</th>
                 </tr>
               </thead>
               <tbody>
                 {data.map((dept, index) => {
-                  // Find admin or fallback
+                  const rank = dept.rank || (index + 1);
                   const admin = dept.users.find(u => u.role === 'department_admin') || dept.users[0];
                   const adminName = admin ? admin.name : 'Unassigned';
                   const initials = admin ? getInitials(adminName) : dept.department.substring(0, 2).toUpperCase();
 
-                  // Determine progress bar color
                   const progress = dept.completionRate || 0;
-                  let progressColor = '#021c3b'; // dark blue
-                  if (progress < 40) progressColor = '#ef4444'; // red
-                  else if (progress < 75) progressColor = '#f59e0b'; // yellow
-                  else if (progress > 90) progressColor = '#10b981'; // green
+                  let progressColor = '#021c3b';
+                  if (progress < 40) progressColor = '#ef4444';
+                  else if (progress < 75) progressColor = '#f59e0b';
+                  else if (progress > 90) progressColor = '#10b981';
+
+                  const avgRating = dept.averageRating || 0;
 
                   return (
                     <React.Fragment key={dept.department}>
@@ -232,107 +316,251 @@ const NaacDashboardPage: React.FC = () => {
                       >
                         {/* Department & Admin */}
                         <td>
-                        <div className="dept-admin-cell">
-                          <div className={`avatar bg-color-${index % 5}`}>{initials}</div>
-                          <div className="dept-admin-info">
-                            <span className="dept-name-full">{dept.department}</span>
-                            <span className="admin-name">{adminName} &bull; {admin?.role === 'department_admin' ? 'Admin' : 'Staff'}</span>
+                          <div className="dept-admin-cell">
+                            <span className={`naac-table-rank ${rank <= 3 ? `rank-${rank}` : ''}`}>#{rank}</span>
+                            <div className={`avatar bg-color-${index % 5}`}>{initials}</div>
+                            <div className="dept-admin-info">
+                              <span className="dept-name-full">{dept.department}</span>
+                              <span className="admin-name">{adminName} &bull; {admin?.role === 'department_admin' ? 'Admin' : 'Staff'}</span>
+                            </div>
                           </div>
-                        </div>
-                      </td>
-                      
-                      {/* Total Tasks */}
-                      <td className="text-center">
-                        <span className="total-tasks-val">{dept.totalTasksGiven}</span>
-                      </td>
+                        </td>
 
-                      {/* Status Distribution */}
-                      <td>
-                        <div className="status-pills">
-                          <span className="status-pill comp">{dept.totalTasksCompleted} Comp</span>
-                          <span className="status-pill rev">{dept.totalTasksInReview} Rev</span>
-                          <span className="status-pill pend">{dept.totalTasksPending} Pend</span>
-                        </div>
-                      </td>
-
-                      {/* Overall Progress */}
-                      <td className="text-center">
-                        <div className="progress-cell">
-                          <div className="progress-bar-flat-bg">
-                            <div 
-                              className="progress-bar-flat-fill" 
-                              style={{ width: `${progress}%`, backgroundColor: progressColor }}
-                            ></div>
+                        {/* Avg Rating */}
+                        <td className="text-center">
+                          <div className="dept-rating-cell" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontWeight: 700 }}>
+                            <Star size={14} fill={avgRating > 0 ? '#eab308' : 'none'} color="#eab308" />
+                            <span>{avgRating > 0 ? avgRating.toFixed(1) : '—'}</span>
+                            <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>/5</span>
                           </div>
-                          <span className="progress-val">{progress}%</span>
-                        </div>
-                      </td>
+                        </td>
+                        
+                        {/* Total Tasks */}
+                        <td className="text-center">
+                          <span className="total-tasks-val">{dept.totalTasksGiven}</span>
+                        </td>
 
-                      {/* Actions */}
-                      <td className="text-center">
-                        <button className="action-arrow">
-                          {expandedDept === dept.department ? <ChevronUp size={18} /> : <ChevronRight size={18} />}
-                        </button>
-                      </td>
-                    </tr>
-                    
-                    {expandedDept === dept.department && (
-                      <tr className="expanded-row-container">
-                        <td colSpan={5} className="expanded-cell">
-                          <table className="user-table">
-                            <thead>
-                              <tr>
-                                <th>NAME</th>
-                                <th>ROLE</th>
-                                <th className="text-center">TOTAL</th>
-                                <th className="text-center">PENDING</th>
-                                <th className="text-center">IN REVIEW</th>
-                                <th className="text-center">COMPLETED</th>
-                                <th className="text-center">PROGRESS</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {dept.users.map(user => {
-                                const userCompletion = user.tasksGiven > 0 ? Math.round((user.tasksCompleted / user.tasksGiven) * 100) : 0;
-                                return (
-                                  <tr key={user._id}>
-                                    <td>
-                                      <div className="user-name-cell">
-                                        <div className="user-avatar">{getInitials(user.name)}</div>
-                                        <span>{user.name}</span>
-                                      </div>
-                                    </td>
-                                    <td><span className="user-role">{user.role === 'department_admin' ? 'Admin' : 'Staff'}</span></td>
-                                    <td className="text-center font-semibold">{user.tasksGiven}</td>
-                                    <td className="text-center"><span className="status-dot pending"></span>{user.tasksPending}</td>
-                                    <td className="text-center"><span className="status-dot review"></span>{user.tasksInReview}</td>
-                                    <td className="text-center"><span className="status-dot completed"></span>{user.tasksCompleted}</td>
-                                    <td>
-                                      <div className="user-progress-bar">
-                                        <div className="progress-bar-fill" style={{ width: `${userCompletion}%`, backgroundColor: userCompletion === 100 ? '#10b981' : '#6366f1' }}></div>
-                                      </div>
-                                    </td>
-                                  </tr>
-                                );
-                              })}
-                            </tbody>
-                          </table>
+                        {/* Status Distribution */}
+                        <td>
+                          <div className="status-pills">
+                            <span className="status-pill comp">{dept.totalTasksCompleted} Comp</span>
+                            <span className="status-pill rev">{dept.totalTasksInReview} Rev</span>
+                            <span className="status-pill pend">{dept.totalTasksPending} Pend</span>
+                          </div>
+                        </td>
+
+                        {/* Overall Progress */}
+                        <td className="text-center">
+                          <div className="progress-cell">
+                            <div className="progress-bar-flat-bg">
+                              <div 
+                                className="progress-bar-flat-fill" 
+                                style={{ width: `${progress}%`, backgroundColor: progressColor }}
+                              ></div>
+                            </div>
+                            <span className="progress-val">{progress}%</span>
+                          </div>
+                        </td>
+
+                        {/* Actions */}
+                        <td className="text-center">
+                          <button 
+                            className="btn btn-sm btn-secondary"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedDeptModal(dept);
+                            }}
+                            style={{ fontSize: '0.75rem', padding: '4px 8px' }}
+                          >
+                            Staff Ratings
+                          </button>
                         </td>
                       </tr>
-                    )}
-                  </React.Fragment>
-                );
+                      
+                      {expandedDept === dept.department && (
+                        <tr className="expanded-row-container">
+                          <td colSpan={6} className="expanded-cell">
+                            <table className="user-table">
+                              <thead>
+                                <tr>
+                                  <th>NAME</th>
+                                  <th>ROLE</th>
+                                  <th className="text-center">RATING</th>
+                                  <th className="text-center">TOTAL</th>
+                                  <th className="text-center">PENDING</th>
+                                  <th className="text-center">IN REVIEW</th>
+                                  <th className="text-center">COMPLETED</th>
+                                  <th className="text-center">PROGRESS</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {dept.users.map(user => {
+                                  const userCompletion = user.tasksGiven > 0 ? Math.round((user.tasksCompleted / user.tasksGiven) * 100) : 0;
+                                  const uAvg = user.averageRating || 0;
+                                  return (
+                                    <tr key={user._id}>
+                                      <td>
+                                        <div className="user-name-cell">
+                                          <div className="user-avatar">{getInitials(user.name)}</div>
+                                          <span>{user.name}</span>
+                                        </div>
+                                      </td>
+                                      <td>
+                                        <span className={`user-role ${user.role === 'department_admin' ? 'admin' : ''}`}>
+                                          {user.role === 'department_admin' ? 'Dept Admin' : 'Staff'}
+                                        </span>
+                                      </td>
+                                      <td className="text-center">
+                                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', fontWeight: 600 }}>
+                                          <Star size={13} fill={uAvg > 0 ? '#eab308' : 'none'} color="#eab308" />
+                                          <span>{uAvg > 0 ? uAvg.toFixed(1) : '—'}</span>
+                                        </div>
+                                      </td>
+                                      <td className="text-center font-semibold">{user.tasksGiven}</td>
+                                      <td className="text-center"><span className="status-dot pending"></span>{user.tasksPending}</td>
+                                      <td className="text-center"><span className="status-dot review"></span>{user.tasksInReview}</td>
+                                      <td className="text-center"><span className="status-dot completed"></span>{user.tasksCompleted}</td>
+                                      <td>
+                                        <div className="user-progress-bar">
+                                          <div className="progress-bar-fill" style={{ width: `${userCompletion}%`, backgroundColor: userCompletion === 100 ? '#10b981' : '#6366f1' }}></div>
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  );
                 })}
-                {data.length === 0 && (
-                  <tr>
-                    <td colSpan={5} className="text-center py-8 text-gray-500">No department data available.</td>
-                  </tr>
-                )}
               </tbody>
             </table>
           </div>
         </div>
       </div>
+
+      {/* Modal: Department Staff Ratings & Performance List */}
+      {selectedDeptModal && (
+        <div className="naac-modal-overlay" onClick={() => setSelectedDeptModal(null)}>
+          <div className="naac-modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="naac-modal-header">
+              <div className="naac-modal-title-area">
+                <div className="naac-modal-title-row">
+                  <Building2 size={22} color="#0f172a" />
+                  <h2>{selectedDeptModal.department}</h2>
+                  <span className={`naac-rank-badge rank-${selectedDeptModal.rank && selectedDeptModal.rank <= 3 ? selectedDeptModal.rank : 'default'}`}>
+                    Rank #{selectedDeptModal.rank || 1}
+                  </span>
+                </div>
+                <p className="naac-modal-subtitle">
+                  Complete staff & admin ratings ranking for this department. Admin is displayed at the top of the roster.
+                </p>
+              </div>
+              <button className="naac-modal-close" onClick={() => setSelectedDeptModal(null)}>
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Department Summary Banner in Modal */}
+            <div className="naac-modal-dept-stats">
+              <div className="naac-dept-summary-card">
+                <span className="dept-stat-lbl">Department Overall Rating</span>
+                <div className="dept-stat-star-box">
+                  <Star size={20} fill={selectedDeptModal.averageRating && selectedDeptModal.averageRating > 0 ? '#eab308' : 'none'} color="#eab308" />
+                  <span className="dept-stat-big-score">{selectedDeptModal.averageRating && selectedDeptModal.averageRating > 0 ? selectedDeptModal.averageRating.toFixed(1) : '—'}</span>
+                  <span className="dept-stat-max">/ 5.0</span>
+                </div>
+                <span className="dept-stat-sub">{selectedDeptModal.totalRatings || 0} Ratings recorded</span>
+              </div>
+
+              <div className="naac-dept-summary-card">
+                <span className="dept-stat-lbl">Total Team Members</span>
+                <span className="dept-stat-big-num">{selectedDeptModal.users.length}</span>
+                <span className="dept-stat-sub">Admins & Staff</span>
+              </div>
+
+              <div className="naac-dept-summary-card">
+                <span className="dept-stat-lbl">Tasks Completed</span>
+                <span className="dept-stat-big-num">{selectedDeptModal.totalTasksCompleted}</span>
+                <span className="dept-stat-sub">{selectedDeptModal.completionRate}% Completion Rate</span>
+              </div>
+            </div>
+
+            {/* Members Leaderboard Table */}
+            <div className="naac-modal-table-wrapper">
+              <table className="naac-modal-table">
+                <thead>
+                  <tr>
+                    <th>RANK</th>
+                    <th>MEMBER</th>
+                    <th>ROLE</th>
+                    <th className="text-center">AVG RATING</th>
+                    <th className="text-center">REVIEWS</th>
+                    <th className="text-center">TASKS COMPLETED</th>
+                    <th className="text-center">ON-TIME %</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {selectedDeptModal.users.map((u, idx) => {
+                    const isAdmin = u.role === 'department_admin';
+                    const uAvg = u.averageRating || 0;
+                    return (
+                      <tr key={u._id} className={isAdmin ? 'naac-admin-row' : ''}>
+                        <td className="naac-modal-rank-cell">
+                          {isAdmin ? (
+                            <span className="naac-modal-admin-badge" title="Department Admin">
+                              <Crown size={14} /> ADMIN
+                            </span>
+                          ) : (
+                            <span className={`pp-rank-badge pp-rank-${u.rank && u.rank <= 3 ? u.rank : 'default'}`}>
+                              {u.rank === 1 ? '🥇 #1' : u.rank === 2 ? '🥈 #2' : u.rank === 3 ? '🥉 #3' : `#${u.rank || (idx + 1)}`}
+                            </span>
+                          )}
+                        </td>
+                        <td>
+                          <div className="naac-modal-user-cell">
+                            <div className="naac-modal-avatar" style={{ backgroundImage: `url(https://ui-avatars.com/api/?name=${encodeURIComponent(u.name)}&background=${isAdmin ? '1e3a8a' : '0f172a'}&color=fff)` }} />
+                            <div>
+                              <span className="naac-modal-user-name">{u.name}</span>
+                              <span className="naac-modal-user-id">ID: {u.universityId || 'N/A'}</span>
+                            </div>
+                          </div>
+                        </td>
+                        <td>
+                          <span className={`naac-role-pill ${isAdmin ? 'admin' : 'staff'}`}>
+                            {isAdmin ? 'Dept Admin' : 'Staff'}
+                          </span>
+                        </td>
+                        <td className="text-center">
+                          <div className="naac-modal-rating">
+                            <Star size={14} fill={uAvg > 0 ? '#eab308' : 'none'} color="#eab308" />
+                            <strong>{uAvg > 0 ? uAvg.toFixed(1) : '—'}</strong>
+                            <span>/5.0</span>
+                          </div>
+                        </td>
+                        <td className="text-center font-bold">
+                          {u.totalRatings || 0}
+                        </td>
+                        <td className="text-center font-bold">
+                          {u.tasksCompleted}
+                        </td>
+                        <td className="text-center text-green-600 font-bold">
+                          {u.onTimeRate !== undefined ? `${u.onTimeRate}%` : '100%'}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };

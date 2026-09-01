@@ -26,9 +26,9 @@ router.use(authenticate);
 router.post('/', authorizeRoles('super_admin', 'department_admin'), uploadAny.array('attachments'), createTask);
 
 // @route   GET /api/tasks/naac-report
-// @desc    Get department-wise NAAC report
-// @access  Super Admin
-router.get('/naac-report', authorizeRoles('super_admin'), getNaacReport);
+// @desc    Get department-wise NAAC report and leaderboard
+// @access  Super Admin, Department Admin, Staff
+router.get('/naac-report', authorizeRoles('super_admin', 'department_admin', 'staff'), getNaacReport);
 
 // @route   GET /api/tasks
 // @desc    Get all visible tasks with filtering/pagination

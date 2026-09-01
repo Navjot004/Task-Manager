@@ -251,7 +251,7 @@ const DeptAdminStaffPage: React.FC = () => {
                         opacity: addingStaffId === (u.id || u._id) ? 0.7 : 1
                       }}
                       disabled={addingStaffId === (u.id || u._id)}
-                      onClick={() => handleAddStaff(u.id || u._id)}
+                      onClick={() => handleAddStaff(u.id || u._id || '')}
                     >
                       <UserPlus size={16} /> 
                       {addingStaffId === (u.id || u._id) ? 'Adding...' : 'Add to Team'}

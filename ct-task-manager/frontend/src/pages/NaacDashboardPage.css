@@ -478,3 +478,450 @@
   height: 100%;
   border-radius: 4px;
 }
+
+/* NAAC Loading Spinner */
+.naac-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 350px;
+  gap: 1rem;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.naac-spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid #e2e8f0;
+  border-top-color: #021c3b;
+  border-radius: 50%;
+  animation: naacSpin 0.8s linear infinite;
+}
+
+@keyframes naacSpin {
+  to { transform: rotate(360deg); }
+}
+
+/* Top Rated Leaderboard Grid */
+.naac-lb-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1.25rem;
+  margin-top: 1rem;
+}
+
+.naac-lb-card {
+  background-color: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.naac-lb-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 10px 20px -5px rgba(0, 0, 0, 0.1);
+  border-color: #cbd5e1;
+}
+
+.gold-card {
+  border-top: 4px solid #f59e0b;
+  background: linear-gradient(180deg, #fffbeb 0%, #ffffff 40%);
+}
+
+.silver-card {
+  border-top: 4px solid #94a3b8;
+  background: linear-gradient(180deg, #f8fafc 0%, #ffffff 40%);
+}
+
+.bronze-card {
+  border-top: 4px solid #d97706;
+  background: linear-gradient(180deg, #fff7ed 0%, #ffffff 40%);
+}
+
+.naac-lb-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.naac-rank-badge {
+  font-size: 0.75rem;
+  font-weight: 800;
+  padding: 3px 8px;
+  border-radius: 6px;
+}
+
+.rank-1 {
+  background-color: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fcd34d;
+}
+
+.rank-2 {
+  background-color: #f1f5f9;
+  color: #334155;
+  border: 1px solid #cbd5e1;
+}
+
+.rank-3 {
+  background-color: #ffedd5;
+  color: #9a3412;
+  border: 1px solid #fed7aa;
+}
+
+.rank-default {
+  background-color: #f1f5f9;
+  color: #64748b;
+}
+
+.naac-score-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background-color: #fefce8;
+  border: 1px solid #fef08a;
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  color: #854d0e;
+}
+
+.naac-score-pill strong {
+  font-size: 1rem;
+  color: #0f172a;
+}
+
+.naac-score-pill span {
+  font-size: 0.7rem;
+  color: #94a3b8;
+}
+
+.naac-lb-dept-name {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.3;
+}
+
+.naac-lb-admin-line {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  color: #475569;
+}
+
+.naac-lb-stats-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.5rem;
+  background-color: #f8fafc;
+  border-radius: 8px;
+  padding: 0.6rem 0.5rem;
+  text-align: center;
+}
+
+.naac-lb-stat {
+  display: flex;
+  flex-direction: column;
+}
+
+.naac-lb-stat-lbl {
+  font-size: 0.65rem;
+  color: #64748b;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.naac-lb-stat-num {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.naac-lb-view-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  padding: 0.55rem;
+  border: 1px solid #e2e8f0;
+  background-color: #ffffff;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #1e293b;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.naac-lb-view-btn:hover {
+  background-color: #021c3b;
+  color: #ffffff;
+  border-color: #021c3b;
+}
+
+.naac-table-rank {
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: #64748b;
+  margin-right: 0.5rem;
+  min-width: 24px;
+}
+
+/* Modal: Department Staff Ratings & Details */
+.naac-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1200;
+  padding: 1.5rem;
+  animation: naacFadeIn 0.2s ease-out;
+}
+
+@keyframes naacFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.naac-modal-content {
+  background-color: #ffffff;
+  border-radius: 14px;
+  width: 100%;
+  max-width: 960px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+.naac-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 1.5rem;
+  border-bottom: 1px solid #e2e8f0;
+  background-color: #f8fafc;
+}
+
+.naac-modal-title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.naac-modal-title-row h2 {
+  margin: 0;
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.naac-modal-subtitle {
+  margin: 0.25rem 0 0 0;
+  font-size: 0.85rem;
+  color: #64748b;
+}
+
+.naac-modal-close {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: #64748b;
+  padding: 4px;
+  border-radius: 6px;
+  transition: all 0.15s ease;
+}
+
+.naac-modal-close:hover {
+  background-color: #e2e8f0;
+  color: #0f172a;
+}
+
+.naac-modal-dept-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  padding: 1.25rem 1.5rem;
+  background-color: #f1f5f9;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+@media (max-width: 650px) {
+  .naac-modal-dept-stats {
+    grid-template-columns: 1fr;
+  }
+}
+
+.naac-dept-summary-card {
+  background-color: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 0.85rem 1rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.dept-stat-lbl {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+}
+
+.dept-stat-star-box {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  margin: 0.2rem 0;
+}
+
+.dept-stat-big-score {
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: #d97706;
+}
+
+.dept-stat-max {
+  font-size: 0.85rem;
+  color: #94a3b8;
+}
+
+.dept-stat-big-num {
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: #0f172a;
+  margin: 0.2rem 0;
+}
+
+.dept-stat-sub {
+  font-size: 0.725rem;
+  color: #64748b;
+}
+
+.naac-modal-table-wrapper {
+  overflow-y: auto;
+  padding: 1rem 1.5rem;
+  flex: 1;
+}
+
+.naac-modal-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.naac-modal-table th {
+  text-align: left;
+  padding: 0.75rem 0.85rem;
+  background-color: #f8fafc;
+  color: #475569;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.naac-modal-table td {
+  padding: 0.85rem;
+  border-bottom: 1px solid #f1f5f9;
+  vertical-align: middle;
+}
+
+.naac-admin-row {
+  background-color: #f0f9ff;
+  border-left: 3px solid #0284c7;
+}
+
+.naac-modal-admin-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.7rem;
+  font-weight: 800;
+  background-color: #021c3b;
+  color: #fbbf24;
+  padding: 3px 8px;
+  border-radius: 6px;
+}
+
+.naac-modal-user-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.naac-modal-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background-size: cover;
+  background-position: center;
+  flex-shrink: 0;
+}
+
+.naac-modal-user-name {
+  font-weight: 700;
+  color: #0f172a;
+  display: block;
+}
+
+.naac-modal-user-id {
+  font-size: 0.725rem;
+  color: #64748b;
+  display: block;
+}
+
+.naac-role-pill {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.naac-role-pill.admin {
+  background-color: #dbeafe;
+  color: #1d4ed8;
+}
+
+.naac-role-pill.staff {
+  background-color: #f1f5f9;
+  color: #475569;
+}
+
+.naac-modal-rating {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-weight: 700;
+}
+
+.naac-modal-rating strong {
+  color: #0f172a;
+}
+
+.naac-modal-rating span {
+  font-size: 0.75rem;
+  color: #94a3b8;
+}

@@ -2,14 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { 
   PieChart, 
   AlertCircle, 
-  Activity, 
-  Filter, 
-  ArrowUpDown, 
-  ChevronDown, 
-  MoreVertical,
-  Calendar
+  Activity
 } from 'lucide-react';
-import { api, Task, User } from '../services/api';
+import { api, Task } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { calculateUrgency, getUrgencyCardStyle, getUrgencyLabel, getUrgencyColor } from '../utils/taskUrgency';
 import './AdminPage.css';
@@ -52,7 +47,7 @@ const AdminPage: React.FC = () => {
   const completionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
   
   const activeTasks = tasks.filter(t => t.status !== 'completed' && t.status !== 'approved');
-  const highPriorityTasks = activeTasks.filter(t => t.urgency === 'High');
+  const highPriorityTasks = activeTasks.filter(t => calculateUrgency(t.deadline) === 'RED' || calculateUrgency(t.deadline) === 'OVERDUE');
   const pendingReviewTasks = tasks.filter(t => t.status === 'submitted_for_review' && t.reviewStage === 'department_admin');
   
   return (

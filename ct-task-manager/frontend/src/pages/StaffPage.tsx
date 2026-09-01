@@ -44,12 +44,6 @@ const StaffPage: React.FC = () => {
   const now = new Date();
   const overdueTasks = tasks.filter(t => t.status !== 'completed' && t.status !== 'approved' && t.deadline && new Date(t.deadline) < now);
 
-  const activeTasks = tasks.filter(t => t.status !== 'completed' && t.status !== 'approved').sort((a, b) => {
-    // Sort by priority or deadline
-    if (a.urgency === 'High' && b.urgency !== 'High') return -1;
-    if (a.urgency !== 'High' && b.urgency === 'High') return 1;
-    return 0;
-  });
 
   const upcomingDeadlines = tasks
     .filter(t => t.status !== 'completed' && t.status !== 'approved' && t.deadline)
@@ -61,8 +55,8 @@ const StaffPage: React.FC = () => {
     // Ideally we would sort by updatedAt, assuming _id exists we can just take the last 3 for now, or just tasks.slice(0, 3)
     .slice(0, 3)
     .map(t => {
-      const isOverdue = t.deadline && new Date(t.deadline) < now && t.status !== 'Completed';
-      if (t.status === 'Completed') {
+      const isOverdue = t.deadline && new Date(t.deadline) < now && t.status !== 'completed' && t.status !== 'approved';
+      if (t.status === 'completed' || t.status === 'approved') {
         return { type: 'success', title: t.title, text: `Task was completed.`, time: 'Recently' };
       }
       if (isOverdue) {
@@ -230,7 +224,7 @@ const StaffPage: React.FC = () => {
                   </div>
                   <div className="deadline-info">
                     <div className="deadline-name">{task.title}</div>
-                    <div className="deadline-sub">{task.urgency} Priority</div>
+                    <div className="deadline-sub">{getUrgencyLabel(calculateUrgency(task.deadline))} Priority</div>
                   </div>
                 </div>
               ))

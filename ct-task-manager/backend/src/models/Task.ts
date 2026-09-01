@@ -21,6 +21,11 @@ export interface ITask extends Document {
   completionAttachments: mongoose.Types.ObjectId[];
   requiredCompletionExtensions: string[];
   completedAt: Date | null;
+  rating?: number | null;
+  feedback?: string | null;
+  ratedBy?: mongoose.Types.ObjectId | null;
+  ratedAt?: Date | null;
+  ratedUser?: mongoose.Types.ObjectId | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -121,6 +126,31 @@ const taskSchema = new Schema<ITask>(
     completedAt: {
       type: Date,
       default: null
+    },
+    rating: {
+      type: Number,
+      min: 1,
+      max: 5,
+      default: null
+    },
+    feedback: {
+      type: String,
+      default: null
+    },
+    ratedBy: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      default: null
+    },
+    ratedAt: {
+      type: Date,
+      default: null
+    },
+    ratedUser: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+      index: true
     }
   },
   {

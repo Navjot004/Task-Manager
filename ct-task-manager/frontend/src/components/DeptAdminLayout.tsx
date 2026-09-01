@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import './DeptAdminLayout.css';
+import UserProfileDropdown from './UserProfileDropdown';
 
 const DeptAdminLayout: React.FC = () => {
   const { currentUser: user, logout } = useAuth();
@@ -105,22 +106,13 @@ const DeptAdminLayout: React.FC = () => {
               <div className="dept-notification-badge"></div>
             </div>
 
-            <div className="dept-user-profile">
-              <div className="dept-user-info">
-                <div className="dept-user-name" style={{ whiteSpace: 'nowrap' }}>
-                  {user?.name} {user?.universityId ? `(${user.universityId})` : ''}
-                </div>
-                <div className="dept-user-role" style={{ whiteSpace: 'nowrap' }}>
-                  Department Admin : {user?.department || 'School of Engineering and Technology'}
-                </div>
-              </div>
-              <div 
-                className="dept-user-avatar"
-                style={{
-                  backgroundImage: `url(https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'DA')}&background=1e3a8a&color=fff)`
-                }}
-              ></div>
-            </div>
+            <UserProfileDropdown 
+              user={user}
+              roleLabel="Department Admin"
+              avatarBg="1e3a8a"
+              avatarColor="fff"
+              profilePath="/admin/profile"
+            />
           </div>
         </header>
 

@@ -61,6 +61,36 @@ export interface User {
   isActive?: boolean;
 }
 
+export interface Task {
+  _id: string;
+  id?: string;
+  taskId?: string;
+  title: string;
+  description: string;
+  createdBy: any;
+  assignedTo: any;
+  delegatedTo?: any;
+  deadline: string;
+  status: 'pending' | 'in_progress' | 'completed' | 'submitted_for_review' | 'approved' | 'rejected';
+  isSubtask?: boolean;
+  workflowType?: string;
+  reviewStage?: string;
+  currentReviewer?: any;
+  reviewRequestedBy?: any;
+  rejectionReason?: string | null;
+  attachments?: string[];
+  completionAttachments?: string[];
+  requiredCompletionExtensions?: string[];
+  completedAt?: string | null;
+  rating?: number | null;
+  feedback?: string | null;
+  ratedBy?: any;
+  ratedAt?: string | null;
+  ratedUser?: any;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Department {
   _id: string;
   name: string;
@@ -462,12 +492,30 @@ export const api = {
   getNaacReport: async (): Promise<{ success: boolean; data: any }> => {
     return fetchWithAuth(`/api/tasks/naac-report`);
   },
-  reviewTask: async (taskId: string, decision: 'approved' | 'rejected', reason?: string): Promise<{ success: boolean; data: { task: any } }> => {
+  reviewTask: async (taskId: string, decision: 'approved' | 'rejected', reason?: string, rating?: number, feedback?: string): Promise<{ success: boolean; data: { task: any } }> => {
     return fetchWithAuth(`/api/tasks/${taskId}/review`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ decision, reason }),
+      body: JSON.stringify({ decision, reason, rating, feedback }),
     });
+  },
+
+  getUserProfile: async (userId?: string): Promise<{ success: boolean; data: { user: any; performance: any } }> => {
+    return fetchWithAuth(userId ? `/api/users/profile/${userId}` : `/api/users/profile`);
+  },
+
+  updateUserProfile: async (updates: { department?: string; phone?: string; name?: string }): Promise<{ success: boolean; message: string; data: { user: any } }> => {
+    const response = await fetch(`${API_URL}/api/users/profile`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${tokenStorage.getToken()}`
+      },
+      body: JSON.stringify(updates),
+    });
+    const json = await response.json();
+    if (!response.ok) throw new Error(json.message || 'Failed to update profile');
+    return json;
   },
 
   createSubtask: async (taskId: string, data: { title: string; description: string; deadline: string; assignedTo: string }): Promise<{ success: boolean; data: { task: any } }> => {

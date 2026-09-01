@@ -293,6 +293,8 @@ export const getTasks = async (req: Request, res: Response) => {
       .populate('createdBy', 'name role universityId')
       .populate('assignedTo', 'name role department universityId')
       .populate('delegatedTo', 'name role department universityId')
+      .populate('ratedBy', 'name role universityId')
+      .populate('ratedUser', 'name role department universityId')
       .populate('parentTaskId', 'taskId title')
       .sort(sortObj)
       .skip((page - 1) * limit)
@@ -317,6 +319,9 @@ export const getTaskById = async (req: Request, res: Response) => {
     const task = await Task.findById(req.params.id)
       .populate('createdBy', 'name role universityId')
       .populate('assignedTo', 'name role department universityId')
+      .populate('delegatedTo', 'name role department universityId')
+      .populate('ratedBy', 'name role universityId')
+      .populate('ratedUser', 'name role department universityId')
       .populate('parentTaskId', 'taskId title');
       
     if (!task) return res.status(404).json({ success: false, message: 'Task not found' });
@@ -373,6 +378,11 @@ export const updateTask = async (req: Request, res: Response) => {
       if (task.createdBy.toString() !== user._id.toString()) {
         return res.status(403).json({ success: false, message: 'Forbidden. Department Admin can only edit tasks they created.' });
       }
+    }
+
+    // Only allow editing when status is pending
+    if (task.status !== 'pending') {
+      return res.status(400).json({ success: false, message: 'Tasks can only be edited while in pending status.' });
     }
 
     if (title) task.title = title;
@@ -647,7 +657,7 @@ export const submitReview = async (req: Request, res: Response) => {
 // PATCH /api/tasks/:id/review
 export const reviewTask = async (req: Request, res: Response) => {
   try {
-    const { decision, reason } = req.body;
+    const { decision, reason, rating, feedback } = req.body;
     const user = req.user;
 
     if (!['approved', 'rejected'].includes(decision)) {
@@ -691,6 +701,8 @@ export const reviewTask = async (req: Request, res: Response) => {
     }
 
     if (decision === 'approved') {
+      let finalApproved = false;
+
       // Subtasks are fully approved once the creator approves them
       if (task.isSubtask && task.createdBy.toString() === user._id.toString()) {
         task.status = 'approved';
@@ -698,11 +710,11 @@ export const reviewTask = async (req: Request, res: Response) => {
         task.reviewStage = 'none';
         task.currentReviewer = null;
         task.rejectionReason = null;
+        finalApproved = true;
       }
       // Multi-stage delegated task logic
       else if (task.delegatedTo && user.role === 'department_admin') {
         // Dept admin approved a delegated task, send to Super Admin if Super Admin created it
-        // Or if super_admin assigned it to them
         const creator = await User.findById(task.createdBy);
         if (creator && creator.role === 'super_admin') {
           task.reviewStage = 'super_admin';
@@ -716,6 +728,7 @@ export const reviewTask = async (req: Request, res: Response) => {
           task.reviewStage = 'none';
           task.currentReviewer = null;
           task.rejectionReason = null;
+          finalApproved = true;
         }
       } else if (user.role === 'super_admin') {
         task.status = 'approved';
@@ -723,6 +736,7 @@ export const reviewTask = async (req: Request, res: Response) => {
         task.reviewStage = 'none';
         task.currentReviewer = null;
         task.rejectionReason = null;
+        finalApproved = true;
       } else if (task.reviewStage === 'department_admin') {
         task.reviewStage = 'super_admin';
         task.status = 'submitted_for_review'; // Stays in review, but moved to super admin
@@ -734,6 +748,24 @@ export const reviewTask = async (req: Request, res: Response) => {
         task.reviewStage = 'none';
         task.currentReviewer = null;
         task.rejectionReason = null;
+        finalApproved = true;
+      }
+
+      if (finalApproved) {
+        // Rating & Completer attribution:
+        // Case 1: If delegatedTo exists -> credited to that staff member
+        // Case 2: Else if reviewRequestedBy exists -> credited to that submitter
+        // Case 3: Else assignedTo -> credited to assignee
+        const completerId = task.delegatedTo || task.reviewRequestedBy || task.assignedTo;
+        if (completerId) {
+          task.ratedUser = completerId as mongoose.Types.ObjectId;
+        }
+        if (rating && typeof rating === 'number' && rating >= 1 && rating <= 5) {
+          task.rating = rating;
+          task.feedback = feedback ? String(feedback).trim() : null;
+          task.ratedBy = user._id;
+          task.ratedAt = new Date();
+        }
       }
     } else if (decision === 'rejected') {
       task.status = 'rejected';
@@ -930,102 +962,177 @@ export const getNaacReport = async (req: Request, res: Response) => {
   try {
     const User = require('../models/User').default;
     const StaffAssignment = require('../models/StaffAssignment').default;
+    const Department = require('../models/Department').default;
     
-    // 1. Fetch all department admins
-    const deptAdmins = await User.find({ role: 'department_admin', isActive: true }).select('_id name role department');
+    // 1. Fetch all departments from Department model and active users
+    const allDepartments = await Department.find({}).sort({ name: 1 });
+    const allUsers = await User.find({ isActive: true }).select('_id name role department universityId phone email');
 
     const deptMap: { [dept: string]: any } = {};
-    const allUserIdsToFetchTasks: mongoose.Types.ObjectId[] = [];
 
-    // 2. Build the structure based on admins and their assigned staff
-    for (const admin of deptAdmins) {
-      const deptName = admin.department || 'Unassigned Department';
-      if (!deptMap[deptName]) {
-        deptMap[deptName] = {
-          department: deptName,
+    // Initialize all departments
+    allDepartments.forEach((d: any) => {
+      deptMap[d.name] = {
+        department: d.name,
+        code: d.code || '',
+        totalTasksGiven: 0,
+        totalTasksPending: 0,
+        totalTasksInReview: 0,
+        totalTasksCompleted: 0,
+        totalRatings: 0,
+        averageRating: 0,
+        rank: 1,
+        users: []
+      };
+    });
+
+    // Also include any department present on users
+    allUsers.forEach((u: any) => {
+      if (u.department && !deptMap[u.department]) {
+        deptMap[u.department] = {
+          department: u.department,
+          code: '',
           totalTasksGiven: 0,
           totalTasksPending: 0,
           totalTasksInReview: 0,
           totalTasksCompleted: 0,
+          totalRatings: 0,
+          averageRating: 0,
+          rank: 1,
+          users: []
+        };
+      }
+    });
+
+    const allUserIdsToFetchTasks: mongoose.Types.ObjectId[] = [];
+
+    // Map users to their respective department
+    allUsers.forEach((u: any) => {
+      if (u.role === 'super_admin') return; // Super admin not counted in department stats
+      const deptName = u.department || 'Unassigned Department';
+      if (!deptMap[deptName]) {
+        deptMap[deptName] = {
+          department: deptName,
+          code: '',
+          totalTasksGiven: 0,
+          totalTasksPending: 0,
+          totalTasksInReview: 0,
+          totalTasksCompleted: 0,
+          totalRatings: 0,
+          averageRating: 0,
+          rank: 1,
           users: []
         };
       }
 
-      // Add admin to their department
       deptMap[deptName].users.push({
-        _id: admin._id,
-        name: admin.name,
-        role: admin.role,
-        department: admin.department,
+        _id: u._id,
+        name: u.name,
+        universityId: u.universityId || '',
+        role: u.role,
+        department: u.department,
+        email: u.email,
+        phone: u.phone,
         tasksGiven: 0,
         tasksPending: 0,
         tasksInReview: 0,
-        tasksCompleted: 0
+        tasksCompleted: 0,
+        totalRatings: 0,
+        averageRating: 0,
+        onTimeRate: 100,
+        rank: 0
       });
-      allUserIdsToFetchTasks.push(admin._id);
+      allUserIdsToFetchTasks.push(u._id);
+    });
 
-      // 3. Find their staff members from StaffAssignment
-      const assignments = await StaffAssignment.find({ adminId: admin._id, isActive: true });
-      const staffIds = assignments.map((a: any) => a.staffId);
-      
-      const staffMembers = await User.find({ _id: { $in: staffIds }, isActive: true }).select('_id name role department');
-
-      for (const staff of staffMembers) {
-        // Prevent duplicate staff if already added
-        if (!deptMap[deptName].users.find((u: any) => u._id.toString() === staff._id.toString())) {
-          deptMap[deptName].users.push({
-            _id: staff._id,
-            name: staff.name,
-            role: staff.role,
-            department: staff.department,
-            tasksGiven: 0,
-            tasksPending: 0,
-            tasksInReview: 0,
-            tasksCompleted: 0
-          });
-          allUserIdsToFetchTasks.push(staff._id);
-        }
-      }
-    }
-
-    // 4. Fetch tasks for all these users
+    // 2. Fetch tasks for all these users
     const tasks = await Task.find({
       $or: [
         { assignedTo: { $in: allUserIdsToFetchTasks } },
-        { delegatedTo: { $in: allUserIdsToFetchTasks } }
+        { delegatedTo: { $in: allUserIdsToFetchTasks } },
+        { ratedUser: { $in: allUserIdsToFetchTasks } }
       ]
-    }).select('assignedTo delegatedTo status');
+    }).select('assignedTo delegatedTo ratedUser status rating feedback completedAt deadline');
 
-    // 5. Process data and counts
+    // 3. Process data and counts
     Object.values(deptMap).forEach((deptObj: any) => {
+      let deptRatingsSum = 0;
+      let deptRatingsCount = 0;
+
       deptObj.users.forEach((userObj: any) => {
         const userTasks = tasks.filter(t => {
-          // Count for the "lowest" assignee
-          const currentAssignee = t.delegatedTo ? t.delegatedTo.toString() : (t.assignedTo ? t.assignedTo.toString() : null);
-          return currentAssignee === userObj._id.toString();
+          const completerId = t.ratedUser ? t.ratedUser.toString() : (t.delegatedTo ? t.delegatedTo.toString() : (t.assignedTo ? t.assignedTo.toString() : null));
+          return completerId === userObj._id.toString();
         });
 
         userObj.tasksGiven = userTasks.length;
-        userObj.tasksCompleted = userTasks.filter(t => t.status === 'approved').length;
+        userObj.tasksCompleted = userTasks.filter(t => t.status === 'approved' || t.completedAt).length;
         userObj.tasksPending = userTasks.filter(t => t.status === 'pending' || t.status === 'in_progress' || t.status === 'rejected' || t.status === 'completed').length;
         userObj.tasksInReview = userTasks.filter(t => t.status === 'submitted_for_review').length;
+
+        // User Rating calculation
+        const userRatedTasks = userTasks.filter(t => t.rating && typeof t.rating === 'number' && t.rating > 0);
+        userObj.totalRatings = userRatedTasks.length;
+        const userRatingSum = userRatedTasks.reduce((acc, t) => acc + (t.rating || 0), 0);
+        userObj.averageRating = userObj.totalRatings > 0 ? Number((userRatingSum / userObj.totalRatings).toFixed(1)) : 0;
+
+        // On-time calculation
+        let onTime = 0;
+        let totalFinished = 0;
+        userTasks.forEach(t => {
+          if (t.completedAt && t.deadline) {
+            totalFinished++;
+            if (new Date(t.completedAt).getTime() <= new Date(t.deadline).getTime()) {
+              onTime++;
+            }
+          }
+        });
+        userObj.onTimeRate = totalFinished > 0 ? Math.round((onTime / totalFinished) * 100) : 100;
+
+        deptRatingsSum += userRatingSum;
+        deptRatingsCount += userObj.totalRatings;
 
         deptObj.totalTasksGiven += userObj.tasksGiven;
         deptObj.totalTasksPending += userObj.tasksPending;
         deptObj.totalTasksInReview += userObj.tasksInReview;
         deptObj.totalTasksCompleted += userObj.tasksCompleted;
       });
-      
-      // Sort users inside dept: Admin first, then staff by name
+
+      deptObj.totalRatings = deptRatingsCount;
+      deptObj.averageRating = deptRatingsCount > 0 ? Number((deptRatingsSum / deptRatingsCount).toFixed(1)) : 0;
+
+      // Sort users inside dept: Department Admin first, then Staff sorted by averageRating (desc), totalRatings (desc), totalCompleted (desc), name
       deptObj.users.sort((a: any, b: any) => {
         if (a.role === 'department_admin' && b.role !== 'department_admin') return -1;
         if (b.role === 'department_admin' && a.role !== 'department_admin') return 1;
+        if (b.averageRating !== a.averageRating) return b.averageRating - a.averageRating;
+        if (b.totalRatings !== a.totalRatings) return b.totalRatings - a.totalRatings;
+        if (b.tasksCompleted !== a.tasksCompleted) return b.tasksCompleted - a.tasksCompleted;
         return a.name.localeCompare(b.name);
+      });
+
+      // Assign ranking among staff
+      let staffRank = 1;
+      deptObj.users.forEach((u: any) => {
+        if (u.role === 'staff') {
+          u.rank = staffRank++;
+        }
       });
     });
 
-    const result = Object.values(deptMap);
-    return res.status(200).json({ success: true, data: result });
+    // 4. Sort departments by averageRating (desc), then totalTasksCompleted (desc) and assign department rank
+    const deptList = Object.values(deptMap).filter((d: any) => d.users.length > 0 || d.totalTasksGiven > 0);
+    deptList.sort((a: any, b: any) => {
+      if (b.averageRating !== a.averageRating) return b.averageRating - a.averageRating;
+      if (b.totalTasksCompleted !== a.totalTasksCompleted) return b.totalTasksCompleted - a.totalTasksCompleted;
+      return a.department.localeCompare(b.department);
+    });
+
+    deptList.forEach((d: any, index: number) => {
+      d.rank = index + 1;
+    });
+
+    return res.status(200).json({ success: true, data: deptList });
   } catch (error) {
     console.error('Error fetching NAAC report:', error);
     return res.status(500).json({ success: false, message: 'Server Error' });

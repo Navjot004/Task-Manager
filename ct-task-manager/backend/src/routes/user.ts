@@ -5,12 +5,23 @@ import {
   getUserById,
   updateUserRole,
   updateUserStatus,
+  getUserProfile,
+  updateUserProfile,
 } from '../controllers/userController';
 import { authenticate, authorizeRoles } from '../middleware/auth';
 
 const router = Router();
 
 router.use(authenticate);
+
+// @route   GET /api/users/profile, GET /api/users/profile/:id
+// @desc    Get user profile with rating and performance stats
+router.get('/profile', getUserProfile);
+router.get('/profile/:id', getUserProfile);
+
+// @route   PATCH /api/users/profile
+// @desc    Update current user's profile (e.g. department, phone)
+router.patch('/profile', updateUserProfile);
 
 // @route   GET /api/users
 // @desc    Get all registered users with pagination & filtering

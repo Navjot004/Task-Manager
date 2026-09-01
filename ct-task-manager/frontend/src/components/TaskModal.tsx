@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, ChevronDown } from 'lucide-react';
+import { Search, ChevronDown, Paperclip, FileText, Star } from 'lucide-react';
 import { api } from '../services/api';
 import { calculateUrgency, getUrgencyColor, getUrgencyLabel } from '../utils/taskUrgency';
 import './TaskModal.css';
@@ -142,6 +142,12 @@ const TaskModal: React.FC<TaskModalProps> = ({ task: initialTask, onClose, onRef
   const [fileError, setFileError] = useState('');
   const reviewFileInputRef = useRef<HTMLInputElement>(null);
 
+  // Approval Rating mode
+  const [isApproving, setIsApproving] = useState(false);
+  const [reviewRating, setReviewRating] = useState<number>(5);
+  const [hoverRating, setHoverRating] = useState<number>(0);
+  const [reviewFeedback, setReviewFeedback] = useState<string>('');
+
   const refreshTaskData = async () => {
     try {
       const res = await api.getTaskById(task._id);
@@ -163,6 +169,10 @@ const TaskModal: React.FC<TaskModalProps> = ({ task: initialTask, onClose, onRef
     setIsAssigning(false);
     setIsRejecting(false);
     setRejectionReason('');
+    setIsApproving(false);
+    setReviewRating(5);
+    setHoverRating(0);
+    setReviewFeedback('');
     setIsSubmittingReview(false);
     setReviewFiles([]);
     setFileError('');
@@ -190,7 +200,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ task: initialTask, onClose, onRef
 
 
   const canEdit = (currentUser.role === 'super_admin' || currentUser.role === 'department_admin') && 
-    task.status !== 'submitted_for_review' && task.status !== 'approved';
+    task.status === 'pending';
   
   const canAssign = (currentUser.role === 'super_admin' || currentUser.role === 'department_admin') && 
     task.status !== 'submitted_for_review' && task.status !== 'approved';
@@ -226,8 +236,9 @@ const TaskModal: React.FC<TaskModalProps> = ({ task: initialTask, onClose, onRef
     const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
     return (
-      <div style={{ marginTop: '1rem' }}>
-        <div style={{ fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 600, marginBottom: '0.5rem' }}>
+      <div style={{ margin: '1rem 0', padding: '1rem', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', width: '100%', boxSizing: 'border-box' }}>
+        <div style={{ fontSize: '0.75rem', color: '#475569', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.05em', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+          <Paperclip size={14} />
           {title}
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
@@ -240,11 +251,24 @@ const TaskModal: React.FC<TaskModalProps> = ({ task: initialTask, onClose, onRef
                 href={`${apiUrl}/api/files/${file._id}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', color: '#3b82f6', textDecoration: 'none', fontSize: '0.9rem', backgroundColor: '#f0f9ff', padding: '0.5rem 0.75rem', borderRadius: '0.375rem', border: '1px solid #bae6fd' }}
+                style={{ 
+                  display: 'inline-flex', 
+                  alignItems: 'center', 
+                  gap: '0.6rem', 
+                  color: '#2563eb', 
+                  textDecoration: 'none', 
+                  fontSize: '0.875rem', 
+                  backgroundColor: '#ffffff', 
+                  padding: '0.6rem 0.85rem', 
+                  borderRadius: '6px', 
+                  border: '1px solid #cbd5e1',
+                  transition: 'all 0.2s ease',
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
+                }}
               >
-                <svg style={{ width: '16px', height: '16px' }} fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"></path></svg>
-                <span style={{ fontWeight: 500 }}>{file.filename}</span>
-                <span style={{ color: '#94a3b8', fontSize: '0.8rem' }}>({Math.round(file.length / 1024)} KB)</span>
+                <FileText size={16} color="#3b82f6" style={{ flexShrink: 0 }} />
+                <span style={{ fontWeight: 600, color: '#0f172a', wordBreak: 'break-all' }}>{file.filename}</span>
+                <span style={{ color: '#64748b', fontSize: '0.8rem', marginLeft: 'auto', flexShrink: 0, paddingLeft: '0.5rem' }}>({Math.round(file.length / 1024)} KB)</span>
               </a>
             ))
           )}
@@ -361,8 +385,15 @@ const TaskModal: React.FC<TaskModalProps> = ({ task: initialTask, onClose, onRef
         setLoading(false);
         return;
       }
-      await api.reviewTask(task._id, decision, decision === 'rejected' ? rejectionReason : undefined);
+      await api.reviewTask(
+        task._id, 
+        decision, 
+        decision === 'rejected' ? rejectionReason : undefined,
+        decision === 'approved' && reviewRating ? reviewRating : undefined,
+        decision === 'approved' && reviewFeedback ? reviewFeedback : undefined
+      );
       setIsRejecting(false);
+      setIsApproving(false);
       refreshTaskData();
     } catch (err: any) {
       setError(err.message);
@@ -467,18 +498,15 @@ const TaskModal: React.FC<TaskModalProps> = ({ task: initialTask, onClose, onRef
                 </div>
               )}
               
-              {task.workflowType && (
-                <div>
-                  <div style={{ fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 600, marginBottom: '0.25rem' }}>Workflow</div>
-                  <div style={{ fontWeight: 500, color: '#0f172a' }}>{task.workflowType.replace(/_/g, ' ').toUpperCase()}</div>
+              {/* Completion Date */}
+              <div>
+                <div style={{ fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 600, marginBottom: '0.25rem' }}>Completion Date</div>
+                <div style={{ fontWeight: 500, color: task.completedAt || task.status === 'completed' || task.status === 'approved' ? '#0f172a' : '#64748b' }}>
+                  {task.completedAt 
+                    ? formatDateTimeDDMMYYYY(task.completedAt) 
+                    : (task.status === 'completed' || task.status === 'approved' ? 'Completed' : 'Not completed yet')}
                 </div>
-              )}
-              {task.reviewStage && task.reviewStage !== 'none' && (
-                <div>
-                  <div style={{ fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 600, marginBottom: '0.25rem' }}>Review Stage</div>
-                  <div style={{ fontWeight: 500, color: '#0f172a' }}>{task.reviewStage.replace(/_/g, ' ').toUpperCase()}</div>
-                </div>
-              )}
+              </div>
               
               {task.requiredCompletionExtensions && task.requiredCompletionExtensions.length > 0 && (
                 <div style={{ gridColumn: '1 / -1' }}>
@@ -491,270 +519,426 @@ const TaskModal: React.FC<TaskModalProps> = ({ task: initialTask, onClose, onRef
                 </div>
               )}
               
-              {/* Completion Date & Timeline Info */}
-              {(task.status === 'completed' || task.status === 'approved') && (
-                <>
-                  {task.completedAt && (
-                    <div>
-                      <div style={{ fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 600, marginBottom: '0.25rem' }}>Completion Date</div>
-                      <div style={{ fontWeight: 500, color: '#0f172a' }}>{formatDateTimeDDMMYYYY(task.completedAt)}</div>
+              {/* Completion Timeline Delta Info */}
+              {(task.status === 'completed' || task.status === 'approved') && task.completedAt && (() => {
+                const completedDate = new Date(task.completedAt);
+                const deadlineDate = new Date(task.deadline);
+                const diffTime = deadlineDate.getTime() - completedDate.getTime();
+                const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+                let timelineText = '';
+                let timelineColor = '';
+                let timelineIcon = '';
+                if (diffDays > 0) {
+                  timelineText = `Completed ${diffDays} day${diffDays !== 1 ? 's' : ''} before deadline`;
+                  timelineColor = '#10b981';
+                  timelineIcon = '✅';
+                } else if (diffDays < 0) {
+                  timelineText = `Completed ${Math.abs(diffDays)} day${Math.abs(diffDays) !== 1 ? 's' : ''} after deadline (overdue)`;
+                  timelineColor = '#ef4444';
+                  timelineIcon = '⚠️';
+                } else {
+                  timelineText = 'Completed exactly on deadline';
+                  timelineColor = '#f59e0b';
+                  timelineIcon = '✅';
+                }
+                return (
+                  <div style={{ gridColumn: '1 / -1' }}>
+                    <div style={{ 
+                      display: 'inline-flex', 
+                      alignItems: 'center', 
+                      gap: '0.4rem',
+                      padding: '0.4rem 0.75rem', 
+                      borderRadius: '6px', 
+                      fontSize: '0.85rem', 
+                      fontWeight: 600,
+                      backgroundColor: timelineColor + '15',
+                      color: timelineColor,
+                      border: `1px solid ${timelineColor}30`
+                    }}>
+                      {timelineIcon} {timelineText}
                     </div>
-                  )}
-                  {task.completedAt && (() => {
-                    const completedDate = new Date(task.completedAt);
-                    const deadlineDate = new Date(task.deadline);
-                    const diffTime = deadlineDate.getTime() - completedDate.getTime();
-                    const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
-                    let timelineText = '';
-                    let timelineColor = '';
-                    let timelineIcon = '';
-                    if (diffDays > 0) {
-                      timelineText = `${diffDays} day${diffDays !== 1 ? 's' : ''} before deadline`;
-                      timelineColor = '#10b981';
-                      timelineIcon = '✅';
-                    } else if (diffDays < 0) {
-                      timelineText = `${Math.abs(diffDays)} day${Math.abs(diffDays) !== 1 ? 's' : ''} overdue`;
-                      timelineColor = '#ef4444';
-                      timelineIcon = '⚠️';
-                    } else {
-                      timelineText = 'Completed on deadline';
-                      timelineColor = '#f59e0b';
-                      timelineIcon = '✅';
-                    }
-                    return (
-                      <div style={{ gridColumn: '1 / -1' }}>
-                        <div style={{ 
-                          display: 'inline-flex', 
-                          alignItems: 'center', 
-                          gap: '0.4rem',
-                          padding: '0.4rem 0.75rem', 
-                          borderRadius: '6px', 
-                          fontSize: '0.85rem', 
-                          fontWeight: 600,
-                          backgroundColor: timelineColor + '15',
-                          color: timelineColor,
-                          border: `1px solid ${timelineColor}30`
-                        }}>
-                          {timelineIcon} {timelineText}
-                        </div>
-                      </div>
-                    );
-                  })()}
-                </>
-              )}
+                  </div>
+                );
+              })()}
               
             </div>
 
-            <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0', paddingTop: '1.5rem', borderTop: '1px solid #e2e8f0', flexWrap: 'wrap', alignItems: 'center' }}>
-              {canEdit && <button className="btn btn-secondary" onClick={() => setIsEditing(true)}>Edit Details</button>}
-              
-              {canAssign && (
-                isAssigning ? (
-                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                    <div className="tm-assign-wrapper" ref={assignDropdownRef}>
-                      <div 
-                        className={`tm-custom-select ${isAssignDropdownOpen ? 'open' : ''}`}
-                        onClick={() => setIsAssignDropdownOpen(!isAssignDropdownOpen)}
-                      >
-                        {assignTarget ? (
-                          <span>{formatNameString(availableAssignees.find(a => a.id === assignTarget))}</span>
-                        ) : (
-                          <span style={{ color: '#94a3b8' }}>-- Unassigned --</span>
-                        )}
-                        <ChevronDown size={16} color="#64748b" />
-                      </div>
-                      
-                      {isAssignDropdownOpen && (
-                        <div className="tm-dropdown-menu">
-                          <div className="tm-dropdown-header">
-                            <div className="tm-dropdown-search">
-                              <Search size={14} className="tm-search-icon" />
-                              <input 
-                                type="text" 
-                                placeholder="Search users..." 
-                                value={assignSearchQuery}
-                                onChange={e => setAssignSearchQuery(e.target.value)}
-                                onClick={e => e.stopPropagation()}
-                                autoFocus
-                              />
-                            </div>
-                            {currentUser.role === 'super_admin' && (
-                              <div className="tm-role-filters">
-                                <button 
-                                  className={`tm-role-filter-btn ${assignRoleFilter === 'all' ? 'active' : ''}`}
-                                  onClick={(e) => { e.stopPropagation(); setAssignRoleFilter('all'); }}
-                                >All</button>
-                                <button 
-                                  className={`tm-role-filter-btn ${assignRoleFilter === 'department_admin' ? 'active' : ''}`}
-                                  onClick={(e) => { e.stopPropagation(); setAssignRoleFilter('department_admin'); }}
-                                >Admins</button>
-                                <button 
-                                  className={`tm-role-filter-btn ${assignRoleFilter === 'staff' ? 'active' : ''}`}
-                                  onClick={(e) => { e.stopPropagation(); setAssignRoleFilter('staff'); }}
-                                >Staff</button>
-                              </div>
-                            )}
-                          </div>
-                          
-                          <ul className="tm-dropdown-list">
-                            <li 
-                              className={`tm-dropdown-item ${!assignTarget ? 'selected' : ''}`}
-                              onClick={() => {
-                                setAssignTarget('');
-                                setIsAssignDropdownOpen(false);
-                              }}
-                            >
-                              <span>-- Unassigned --</span>
-                            </li>
-                            {getFilteredAssignees(assignSearchQuery, assignRoleFilter).length === 0 && (
-                              <li className="tm-dropdown-item empty">No users found</li>
-                            )}
-                            {getFilteredAssignees(assignSearchQuery, assignRoleFilter).map(a => (
-                              <li 
-                                key={a.id}
-                                className={`tm-dropdown-item ${assignTarget === a.id ? 'selected' : ''}`}
-                                onClick={() => {
-                                  setAssignTarget(a.id);
-                                  setIsAssignDropdownOpen(false);
-                                  setAssignSearchQuery('');
-                                }}
-                              >
-                                <span>{a.id === currentUser.id ? 'me' : a.name}</span>
-                                <span className="tm-assignee-role">(ID: {a.universityId || 'N/A'})</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-                    </div>
-                    <button className="btn btn-primary" onClick={handleAssign} disabled={loading} style={{ whiteSpace: 'nowrap' }}>Save Assignment</button>
-                    <button className="btn btn-secondary" onClick={() => setIsAssigning(false)}>Cancel</button>
+            {/* Performance Rating & Feedback Banner on Rated Task */}
+            {task.rating && (
+              <div style={{ margin: '1.25rem 0', padding: '1rem 1.25rem', backgroundColor: '#fefce8', border: '1px solid #fef08a', borderRadius: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.35rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#854d0e', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                      Performance Rating
+                    </span>
+                    <span style={{ display: 'inline-flex', gap: '2px', color: '#eab308' }}>
+                      {[1, 2, 3, 4, 5].map(s => (
+                        <Star key={s} size={16} fill={s <= (task.rating || 0) ? '#eab308' : 'none'} color="#eab308" />
+                      ))}
+                    </span>
+                    <span style={{ fontSize: '0.9rem', fontWeight: 700, color: '#a16207' }}>
+                      ({task.rating}/5)
+                    </span>
                   </div>
-                ) : (
-                  <button className="btn btn-secondary" onClick={() => setIsAssigning(true)}>Assign Staff</button>
-                )
-              )}
-
-              {/* Performer Actions */}
-              {canPerformStaffActions && !isAssigning && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginLeft: 'auto', alignItems: 'flex-end', width: '100%' }}>
-                  <div style={{ display: 'flex', gap: '0.5rem' }}>
-                    {task.status === 'pending' && <button className="btn btn-primary" onClick={() => handleStatusChange('in_progress')} disabled={loading}>Start Task</button>}
-                    {task.status === 'rejected' && <button className="btn btn-primary" onClick={() => handleStatusChange('in_progress')} disabled={loading}>Start Again</button>}
-                    {task.status === 'in_progress' && !isSubmittingReview && <button className="btn btn-success" onClick={() => setIsSubmittingReview(true)} disabled={loading} style={{ backgroundColor: '#10b981', color: 'white' }}>Submit Task</button>}
-                    {task.status === 'completed' && !isSubmittingReview && <button className="btn btn-success" onClick={() => setIsSubmittingReview(true)} disabled={loading} style={{ backgroundColor: '#3b82f6', color: 'white' }}>Submit for Review</button>}
-                    {task.status === 'submitted_for_review' && <span style={{ color: '#d97706', fontWeight: 'bold' }}>Waiting for Review</span>}
-                    {task.status === 'approved' && <span style={{ color: '#059669', fontWeight: 'bold' }}>Approved</span>}
-                  </div>
-                  
-                  {isSubmittingReview && (
-                    <div style={{ backgroundColor: '#f8fafc', padding: '1rem', borderRadius: '8px', border: '1px solid #e2e8f0', width: '100%', marginTop: '0.5rem' }}>
-                      <h4 style={{ margin: '0 0 0.5rem 0' }}>Upload Completion Documents</h4>
-                      {task.requiredCompletionExtensions && task.requiredCompletionExtensions.length > 0 && (
-                        <p style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: '1rem' }}>Required formats: {task.requiredCompletionExtensions.join(', ')}</p>
-                      )}
-                      
-                      <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
-                        <div style={{ flex: 1 }}>
-                          <input 
-                            type="file" 
-                            multiple 
-                            ref={reviewFileInputRef}
-                            style={{ display: 'none' }}
-                            accept={task.requiredCompletionExtensions?.length ? task.requiredCompletionExtensions.join(',') : undefined}
-                            onChange={async (e) => {
-                              if (e.target.files) {
-                                const selected = Array.from(e.target.files);
-                                // Auto-compress images
-                                const compressed = await compressFiles(selected);
-                                if (task.requiredCompletionExtensions?.length) {
-                                  const invalid = compressed.filter(f => {
-                                    const parts = f.name.split('.');
-                                    if (parts.length < 2) return true;
-                                    const ext = '.' + parts.pop()?.toLowerCase();
-                                    return !task.requiredCompletionExtensions.includes(ext);
-                                  });
-                                  if (invalid.length > 0) {
-                                    setFileError(`Invalid file format: ${invalid.map(f=>f.name).join(', ')}. Allowed: ${task.requiredCompletionExtensions.join(', ')}`);
-                                    if (reviewFileInputRef.current) reviewFileInputRef.current.value = '';
-                                    return;
-                                  }
-                                }
-                                setFileError('');
-                                setReviewFiles(compressed);
-                              }
-                            }}
-                          />
-                          <button className="btn btn-secondary" onClick={() => reviewFileInputRef.current?.click()} style={{ width: '100%' }}>
-                            Choose Files
-                          </button>
-                          
-                          {/* File Error Popup */}
-                          {fileError && (
-                            <div style={{
-                              marginTop: '0.75rem',
-                              padding: '0.5rem 0.75rem',
-                              backgroundColor: '#fee2e2',
-                              border: '1px solid #fca5a5',
-                              borderRadius: '6px',
-                              color: '#991b1b',
-                              fontSize: '0.8rem',
-                              position: 'relative',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'space-between'
-                            }}>
-                              <span>{fileError}</span>
-                              <button 
-                                onClick={() => setFileError('')} 
-                                style={{ background: 'transparent', border: 'none', color: '#991b1b', cursor: 'pointer', fontSize: '1rem', padding: '0 0.25rem' }}
-                              >&times;</button>
-                            </div>
-                          )}
-                          {reviewFiles.length > 0 && (
-                            <ul style={{ margin: '0.5rem 0 0 0', paddingLeft: '1rem', fontSize: '0.8rem' }}>
-                              {reviewFiles.map((f, i) => <li key={i}>{f.name}</li>)}
-                            </ul>
-                          )}
-                        </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                          <button className="btn btn-primary" onClick={handleSubmitReview} disabled={loading}>Submit</button>
-                          <button className="btn btn-secondary" onClick={() => { setIsSubmittingReview(false); setReviewFiles([]); }}>Cancel</button>
-                        </div>
-                      </div>
-                    </div>
+                  {task.ratedBy && (
+                    <span style={{ fontSize: '0.75rem', color: '#a16207', fontWeight: 500 }}>
+                      Rated by {task.ratedBy.name}
+                    </span>
                   )}
                 </div>
-              )}
+                {task.feedback && (
+                  <p style={{ margin: '0.35rem 0 0 0', fontSize: '0.875rem', color: '#713f12', fontStyle: 'italic' }}>
+                    "{task.feedback}"
+                  </p>
+                )}
+                {task.ratedUser && (
+                  <span style={{ fontSize: '0.75rem', color: '#a16207', display: 'block', marginTop: '0.35rem' }}>
+                    Awarded to: <strong>{task.ratedUser.name || 'Performer'}</strong> (ID: {task.ratedUser.universityId || 'N/A'})
+                  </span>
+                )}
+              </div>
+            )}
 
-              {/* Review Actions */}
-              {canReview && !isRejecting && (
-                <div style={{ display: 'flex', gap: '0.5rem', marginLeft: 'auto' }}>
-                  <button className="btn btn-success" style={{ backgroundColor: '#10b981', color: 'white' }} onClick={() => handleReviewAction('approved')} disabled={loading}>
-                    {currentUser.role === 'department_admin' && task.reviewStage === 'department_admin' && (task.createdBy?._id !== currentUser.id && task.createdBy?.id !== currentUser.id) ? 'Approve & Send to Super Admin' : 'Approve'}
+            {/* Submitted Completion Documents (Proof of Work) */}
+            {task.completionAttachments && task.completionAttachments.length > 0 && (
+              <AttachmentList fileIds={task.completionAttachments} title="Submitted Documents" />
+            )}
+
+            {/* Rejection Feedback Box */}
+            {isRejecting && (
+              <div style={{ backgroundColor: '#fef2f2', border: '1px solid #fecaca', padding: '1.25rem', borderRadius: '8px', margin: '1rem 0' }}>
+                <h4 style={{ margin: '0 0 0.5rem 0', color: '#991b1b', fontSize: '0.95rem', fontWeight: 600 }}>Reject Task & Request Changes</h4>
+                <textarea 
+                  className="form-control" 
+                  placeholder="Provide reason or feedback for rejection..." 
+                  value={rejectionReason} 
+                  onChange={e => setRejectionReason(e.target.value)}
+                  style={{ width: '100%', minHeight: '80px', padding: '0.75rem', borderRadius: '6px', border: '1px solid #cbd5e1', marginBottom: '0.75rem', boxSizing: 'border-box', fontFamily: 'inherit' }}
+                />
+                <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                  <button className="btn btn-danger" onClick={() => handleReviewAction('rejected')} disabled={loading || !rejectionReason.trim()}>
+                    Submit Rejection
                   </button>
-                  <button className="btn btn-danger" onClick={() => setIsRejecting(true)} disabled={loading}>Reject</button>
+                  <button className="btn btn-secondary" onClick={() => setIsRejecting(false)}>
+                    Cancel
+                  </button>
                 </div>
-              )}
+              </div>
+            )}
 
-              {isRejecting && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginLeft: 'auto', width: '100%', marginTop: '1rem' }}>
-                  <textarea 
-                    className="form-control" 
-                    placeholder="Reason for rejection..." 
-                    value={rejectionReason} 
-                    onChange={e => setRejectionReason(e.target.value)}
-                  />
-                  <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
-                    <button className="btn btn-danger" onClick={() => handleReviewAction('rejected')} disabled={loading || !rejectionReason.trim()}>Submit Rejection</button>
-                    <button className="btn btn-secondary" onClick={() => setIsRejecting(false)}>Cancel</button>
+            {/* Super Admin Approval & Performance Rating Prompt */}
+            {isApproving && (
+              <div style={{ backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', padding: '1.25rem', borderRadius: '8px', margin: '1rem 0' }}>
+                <h4 style={{ margin: '0 0 0.25rem 0', color: '#166534', fontSize: '1rem', fontWeight: 700 }}>
+                  Approve Task & Rate Performance
+                </h4>
+                <p style={{ margin: '0 0 1rem 0', fontSize: '0.85rem', color: '#15803d' }}>
+                  Rate the quality of work for the completer. This rating will be added to their profile.
+                </p>
+
+                {/* Interactive Star Rating */}
+                <div style={{ marginBottom: '1rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: '#166534', letterSpacing: '0.05em', marginBottom: '0.4rem' }}>
+                    Star Rating (1 to 5 Stars)
+                  </label>
+                  <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                    {[1, 2, 3, 4, 5].map((star) => {
+                      const isFilled = (hoverRating || reviewRating) >= star;
+                      return (
+                        <button
+                          key={star}
+                          type="button"
+                          onClick={() => setReviewRating(star)}
+                          onMouseEnter={() => setHoverRating(star)}
+                          onMouseLeave={() => setHoverRating(0)}
+                          style={{
+                            background: 'transparent',
+                            border: 'none',
+                            cursor: 'pointer',
+                            padding: '2px',
+                            color: isFilled ? '#eab308' : '#cbd5e1',
+                            transition: 'transform 0.15s ease',
+                            transform: isFilled ? 'scale(1.15)' : 'scale(1)',
+                          }}
+                        >
+                          <Star size={28} fill={isFilled ? '#eab308' : 'none'} />
+                        </button>
+                      );
+                    })}
+                    <span style={{ marginLeft: '0.5rem', fontWeight: 700, fontSize: '0.95rem', color: '#854d0e' }}>
+                      {reviewRating} / 5 Stars
+                    </span>
                   </div>
                 </div>
-              )}
 
-              {task.completionAttachments && task.completionAttachments.length > 0 && (
-                <AttachmentList fileIds={task.completionAttachments} title="Submitted Documents" />
-              )}
+                {/* Feedback comment */}
+                <div style={{ marginBottom: '1rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: '#166534', letterSpacing: '0.05em', marginBottom: '0.4rem' }}>
+                    Feedback & Commendations (Optional)
+                  </label>
+                  <textarea 
+                    className="form-control" 
+                    placeholder="e.g. Excellent work, delivered ahead of schedule with high quality..." 
+                    value={reviewFeedback} 
+                    onChange={e => setReviewFeedback(e.target.value)}
+                    style={{ width: '100%', minHeight: '75px', padding: '0.75rem', borderRadius: '6px', border: '1px solid #86efac', boxSizing: 'border-box', fontFamily: 'inherit', fontSize: '0.9rem' }}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                  <button 
+                    className="btn btn-success" 
+                    style={{ backgroundColor: '#16a34a', color: 'white', fontWeight: 600, padding: '0.6rem 1.25rem' }}
+                    onClick={() => handleReviewAction('approved')} 
+                    disabled={loading}
+                  >
+                    Confirm & Approve Task
+                  </button>
+                  <button 
+                    className="btn btn-secondary" 
+                    onClick={() => setIsApproving(false)}
+                    disabled={loading}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Modal Bottom Action Bar */}
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center', 
+              marginTop: '1.5rem', 
+              paddingTop: '1.25rem', 
+              borderTop: '1px solid #e2e8f0', 
+              flexWrap: 'wrap', 
+              gap: '0.75rem' 
+            }}>
+              
+              {/* Left Actions: Edit Details / Assign Staff */}
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                {canEdit && (
+                  <button className="btn btn-secondary" onClick={() => setIsEditing(true)}>
+                    Edit Details
+                  </button>
+                )}
+
+                {canAssign && (
+                  isAssigning ? (
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                      <div className="tm-assign-wrapper" ref={assignDropdownRef}>
+                        <div 
+                          className={`tm-custom-select ${isAssignDropdownOpen ? 'open' : ''}`}
+                          onClick={() => setIsAssignDropdownOpen(!isAssignDropdownOpen)}
+                        >
+                          {assignTarget ? (
+                            <span>{formatNameString(availableAssignees.find(a => a.id === assignTarget))}</span>
+                          ) : (
+                            <span style={{ color: '#94a3b8' }}>-- Unassigned --</span>
+                          )}
+                          <ChevronDown size={16} color="#64748b" />
+                        </div>
+                        
+                        {isAssignDropdownOpen && (
+                          <div className="tm-dropdown-menu">
+                            <div className="tm-dropdown-header">
+                              <div className="tm-dropdown-search">
+                                <Search size={14} className="tm-search-icon" />
+                                <input 
+                                  type="text" 
+                                  placeholder="Search users..." 
+                                  value={assignSearchQuery}
+                                  onChange={e => setAssignSearchQuery(e.target.value)}
+                                  onClick={e => e.stopPropagation()}
+                                  autoFocus
+                                />
+                              </div>
+                              {currentUser.role === 'super_admin' && (
+                                <div className="tm-role-filters">
+                                  <button 
+                                    className={`tm-role-filter-btn ${assignRoleFilter === 'all' ? 'active' : ''}`}
+                                    onClick={(e) => { e.stopPropagation(); setAssignRoleFilter('all'); }}
+                                  >All</button>
+                                  <button 
+                                    className={`tm-role-filter-btn ${assignRoleFilter === 'department_admin' ? 'active' : ''}`}
+                                    onClick={(e) => { e.stopPropagation(); setAssignRoleFilter('department_admin'); }}
+                                  >Admins</button>
+                                  <button 
+                                    className={`tm-role-filter-btn ${assignRoleFilter === 'staff' ? 'active' : ''}`}
+                                    onClick={(e) => { e.stopPropagation(); setAssignRoleFilter('staff'); }}
+                                  >Staff</button>
+                                </div>
+                              )}
+                            </div>
+                            
+                            <ul className="tm-dropdown-list">
+                              <li 
+                                className={`tm-dropdown-item ${!assignTarget ? 'selected' : ''}`}
+                                onClick={() => {
+                                  setAssignTarget('');
+                                  setIsAssignDropdownOpen(false);
+                                }}
+                              >
+                                <span>-- Unassigned --</span>
+                              </li>
+                              {getFilteredAssignees(assignSearchQuery, assignRoleFilter).length === 0 && (
+                                <li className="tm-dropdown-item empty">No users found</li>
+                              )}
+                              {getFilteredAssignees(assignSearchQuery, assignRoleFilter).map(a => (
+                                <li 
+                                  key={a.id}
+                                  className={`tm-dropdown-item ${assignTarget === a.id ? 'selected' : ''}`}
+                                  onClick={() => {
+                                    setAssignTarget(a.id);
+                                    setIsAssignDropdownOpen(false);
+                                    setAssignSearchQuery('');
+                                  }}
+                                >
+                                  <span>{a.id === currentUser.id ? 'me' : a.name}</span>
+                                  <span className="tm-assignee-role">(ID: {a.universityId || 'N/A'})</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                      <button className="btn btn-primary" onClick={handleAssign} disabled={loading} style={{ whiteSpace: 'nowrap' }}>Save Assignment</button>
+                      <button className="btn btn-secondary" onClick={() => setIsAssigning(false)}>Cancel</button>
+                    </div>
+                  ) : (
+                    <button className="btn btn-secondary" onClick={() => setIsAssigning(true)}>
+                      Assign Staff
+                    </button>
+                  )
+                )}
+              </div>
+
+              {/* Right Actions: Review / Staff Actions */}
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginLeft: 'auto' }}>
+                
+                {/* Review Actions (Approve / Reject) */}
+                {canReview && !isRejecting && !isApproving && (
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <button 
+                      className="btn btn-success" 
+                      style={{ backgroundColor: '#10b981', color: 'white', fontWeight: 600, padding: '0.6rem 1.25rem' }} 
+                      onClick={() => {
+                        if (currentUser.role === 'super_admin' || (currentUser.role === 'department_admin' && (task.createdBy?._id === currentUser.id || task.createdBy?.id === currentUser.id))) {
+                          setIsApproving(true);
+                        } else {
+                          handleReviewAction('approved');
+                        }
+                      }} 
+                      disabled={loading}
+                    >
+                      {currentUser.role === 'department_admin' && task.reviewStage === 'department_admin' && (task.createdBy?._id !== currentUser.id && task.createdBy?.id !== currentUser.id) ? 'Approve & Send to Super Admin' : 'Approve'}
+                    </button>
+                    <button 
+                      className="btn btn-danger" 
+                      style={{ backgroundColor: '#fee2e2', color: '#b91c1c', border: '1px solid #fca5a5', fontWeight: 600, padding: '0.6rem 1.25rem' }}
+                      onClick={() => setIsRejecting(true)} 
+                      disabled={loading}
+                    >
+                      Reject
+                    </button>
+                  </div>
+                )}
+
+                {/* Performer Staff Actions */}
+                {canPerformStaffActions && !isAssigning && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', alignItems: 'flex-end' }}>
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      {task.status === 'pending' && <button className="btn btn-primary" onClick={() => handleStatusChange('in_progress')} disabled={loading}>Start Task</button>}
+                      {task.status === 'rejected' && <button className="btn btn-primary" onClick={() => handleStatusChange('in_progress')} disabled={loading}>Start Again</button>}
+                      {task.status === 'in_progress' && !isSubmittingReview && <button className="btn btn-success" onClick={() => setIsSubmittingReview(true)} disabled={loading} style={{ backgroundColor: '#10b981', color: 'white' }}>Submit Task</button>}
+                      {task.status === 'completed' && !isSubmittingReview && <button className="btn btn-success" onClick={() => setIsSubmittingReview(true)} disabled={loading} style={{ backgroundColor: '#3b82f6', color: 'white' }}>Submit for Review</button>}
+                      {task.status === 'submitted_for_review' && !canReview && <span style={{ color: '#d97706', fontWeight: 'bold' }}>Waiting for Review</span>}
+                      {task.status === 'approved' && <span style={{ color: '#059669', fontWeight: 'bold' }}>Approved</span>}
+                    </div>
+                    
+                    {isSubmittingReview && (
+                      <div style={{ backgroundColor: '#f8fafc', padding: '1rem', borderRadius: '8px', border: '1px solid #e2e8f0', width: '100%', marginTop: '0.5rem' }}>
+                        <h4 style={{ margin: '0 0 0.5rem 0' }}>Upload Completion Documents</h4>
+                        {task.requiredCompletionExtensions && task.requiredCompletionExtensions.length > 0 && (
+                          <p style={{ fontSize: '0.8rem', color: '#64748b', marginBottom: '1rem' }}>Required formats: {task.requiredCompletionExtensions.join(', ')}</p>
+                        )}
+                        
+                        <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
+                          <div style={{ flex: 1 }}>
+                            <input 
+                              type="file" 
+                              multiple 
+                              ref={reviewFileInputRef}
+                              style={{ display: 'none' }}
+                              accept={task.requiredCompletionExtensions?.length ? task.requiredCompletionExtensions.join(',') : undefined}
+                              onChange={async (e) => {
+                                if (e.target.files) {
+                                  const selected = Array.from(e.target.files);
+                                  // Auto-compress images
+                                  const compressed = await compressFiles(selected);
+                                  if (task.requiredCompletionExtensions?.length) {
+                                    const invalid = compressed.filter(f => {
+                                      const parts = f.name.split('.');
+                                      if (parts.length < 2) return true;
+                                      const ext = '.' + parts.pop()?.toLowerCase();
+                                      return !task.requiredCompletionExtensions.includes(ext);
+                                    });
+                                    if (invalid.length > 0) {
+                                      setFileError(`Invalid file format: ${invalid.map(f=>f.name).join(', ')}. Allowed: ${task.requiredCompletionExtensions.join(', ')}`);
+                                      if (reviewFileInputRef.current) reviewFileInputRef.current.value = '';
+                                      return;
+                                    }
+                                  }
+                                  setFileError('');
+                                  setReviewFiles(compressed);
+                                }
+                              }}
+                            />
+                            <button className="btn btn-secondary" onClick={() => reviewFileInputRef.current?.click()} style={{ width: '100%' }}>
+                              Choose Files
+                            </button>
+                            
+                            {/* File Error Popup */}
+                            {fileError && (
+                              <div style={{
+                                marginTop: '0.75rem',
+                                padding: '0.5rem 0.75rem',
+                                backgroundColor: '#fee2e2',
+                                border: '1px solid #fca5a5',
+                                borderRadius: '6px',
+                                color: '#991b1b',
+                                fontSize: '0.8rem',
+                                position: 'relative',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between'
+                              }}>
+                                <span>{fileError}</span>
+                                <button 
+                                  onClick={() => setFileError('')} 
+                                  style={{ background: 'transparent', border: 'none', color: '#991b1b', cursor: 'pointer', fontSize: '1rem', padding: '0 0.25rem' }}
+                                >&times;</button>
+                              </div>
+                            )}
+                            {reviewFiles.length > 0 && (
+                              <ul style={{ margin: '0.5rem 0 0 0', paddingLeft: '1rem', fontSize: '0.8rem' }}>
+                                {reviewFiles.map((f, i) => <li key={i}>{f.name}</li>)}
+                              </ul>
+                            )}
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                            <button className="btn btn-primary" onClick={handleSubmitReview} disabled={loading}>Submit</button>
+                            <button className="btn btn-secondary" onClick={() => { setIsSubmittingReview(false); setReviewFiles([]); }}>Cancel</button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
             </div>
 
             {/* Subtasks Section */}
@@ -791,35 +975,51 @@ const TaskModal: React.FC<TaskModalProps> = ({ task: initialTask, onClose, onRef
             )}
           </>
         ) : (
-          <div className="form-group">
-            <h3>Edit Task</h3>
-            <label>Title</label>
-            <input 
-              type="text" 
-              className="form-control"
-              value={editData.title}
-              onChange={e => setEditData({...editData, title: e.target.value})}
-            />
+          <div className="tm-edit-form">
+            <div className="tm-edit-header">
+              <h3 className="tm-edit-title">Edit Task</h3>
+              <p className="tm-edit-subtitle">Modify task details while it is in pending status.</p>
+            </div>
+
+            <div className="tm-edit-group">
+              <label className="tm-edit-label">Title</label>
+              <input 
+                type="text" 
+                className="tm-edit-input"
+                placeholder="Enter task title..."
+                value={editData.title}
+                onChange={e => setEditData({...editData, title: e.target.value})}
+              />
+            </div>
             
-            <label style={{ marginTop: '1rem', display: 'block' }}>Description</label>
-            <textarea 
-              className="form-control"
-              rows={5}
-              value={editData.description}
-              onChange={e => setEditData({...editData, description: e.target.value})}
-            />
+            <div className="tm-edit-group">
+              <label className="tm-edit-label">Description</label>
+              <textarea 
+                className="tm-edit-textarea"
+                rows={4}
+                placeholder="Enter task description..."
+                value={editData.description}
+                onChange={e => setEditData({...editData, description: e.target.value})}
+              />
+            </div>
 
-            <label style={{ marginTop: '1rem', display: 'block' }}>Deadline</label>
-            <input 
-              type="datetime-local" 
-              className="form-control"
-              value={editData.deadline}
-              onChange={e => setEditData({...editData, deadline: e.target.value})}
-            />
+            <div className="tm-edit-group">
+              <label className="tm-edit-label">Deadline</label>
+              <input 
+                type="datetime-local" 
+                className="tm-edit-input"
+                value={editData.deadline}
+                onChange={e => setEditData({...editData, deadline: e.target.value})}
+              />
+            </div>
 
-            <div style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem' }}>
-              <button className="btn btn-primary" onClick={handleUpdate} disabled={loading}>Save Changes</button>
-              <button className="btn btn-secondary" onClick={() => setIsEditing(false)}>Cancel</button>
+            <div className="tm-edit-actions">
+              <button className="tm-btn-save" onClick={handleUpdate} disabled={loading}>
+                {loading ? 'Saving...' : 'Save Changes'}
+              </button>
+              <button className="tm-btn-cancel" onClick={() => setIsEditing(false)} disabled={loading}>
+                Cancel
+              </button>
             </div>
           </div>
         )}

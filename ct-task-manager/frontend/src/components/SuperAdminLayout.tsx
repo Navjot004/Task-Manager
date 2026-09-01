@@ -10,15 +10,14 @@ import {
   ShieldCheck, 
   UserPlus, 
   Building, 
-  Settings,
   BarChart2,
   Search,
   Bell,
   Menu,
-  LogOut,
-  X
+  LogOut
 } from 'lucide-react';
 import './SuperAdminLayout.css';
+import UserProfileDropdown from './UserProfileDropdown';
 
 const SuperAdminLayout: React.FC = () => {
   const { logout, currentUser } = useAuth();
@@ -130,20 +129,13 @@ const SuperAdminLayout: React.FC = () => {
               <Bell size={20} />
               {hasNotifications && <span className="sa-notification-badge"></span>}
             </button>
-            <div className="sa-user-profile">
-              <div className="sa-user-info">
-                <span className="sa-user-name">
-                  {currentUser.name || 'Admin'} {currentUser.universityId ? `(${currentUser.universityId})` : ''}
-                </span>
-                <span className="sa-user-role">
-                  Super Admin{currentUser.department ? ` : ${currentUser.department}` : ''}
-                </span>
-              </div>
-              {/* Fallback avatar if no image */}
-              <div className="sa-user-avatar" style={{
-                backgroundImage: `url(https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser.name || 'Admin')}&background=e2e8f0&color=0f172a)`
-              }}></div>
-            </div>
+            <UserProfileDropdown 
+              user={currentUser}
+              roleLabel="Super Admin"
+              avatarBg="e2e8f0"
+              avatarColor="0f172a"
+              profilePath="/super-admin/profile"
+            />
           </div>
         </header>
 

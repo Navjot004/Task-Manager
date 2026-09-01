@@ -5,8 +5,6 @@ import {
   UserPlus, 
   MoreVertical, 
   Mail, 
-  Phone, 
-  Building, 
   ChevronLeft, 
   ChevronRight,
   ShieldAlert,
@@ -23,7 +21,7 @@ const UserManagementPage: React.FC = () => {
   const [totalUsers, setTotalUsers] = useState(0);
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('All');
-  const [statusFilter, setStatusFilter] = useState('All');
+  const statusFilter = 'All';
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
