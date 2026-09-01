@@ -128,8 +128,8 @@ export const ProfilePage: React.FC = () => {
           </div>
         </div>
 
-        {/* Middle Header: Department Rating & University Rank (for Dept Admin & Staff) */}
-        {user.role !== 'super_admin' && departmentStats && (
+        {/* Middle Header: Department Rating & University Rank (strictly for Dept Admin) */}
+        {user.role === 'department_admin' && departmentStats && (
           <div className="pp-dept-score-banner">
             <div className="pp-dept-score-top">
               <div className="pp-dept-score-title">
@@ -494,8 +494,8 @@ export const ProfilePage: React.FC = () => {
 
       </div>
 
-      {/* Department Leaderboard for Dept Admin & Staff */}
-      {user.role !== 'super_admin' && departmentStats && departmentStats.leaderboard && departmentStats.leaderboard.length > 0 && (
+      {/* Department Leaderboard (strictly for Department Admin) */}
+      {user.role === 'department_admin' && departmentStats && departmentStats.leaderboard && departmentStats.leaderboard.length > 0 && (
         <div className="pp-card pp-leaderboard-card">
           <div className="pp-card-header pp-lb-header">
             <div>
