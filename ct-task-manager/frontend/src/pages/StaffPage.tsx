@@ -141,7 +141,7 @@ const StaffPage: React.FC = () => {
                 tasks.slice(0, 5).map((task) => {
                   const isOverdue = task.deadline && new Date(task.deadline) < now;
                   
-                  const urgency = calculateUrgency(task.deadline);
+                  const urgency = calculateUrgency(task);
                   const cardStyle = getUrgencyCardStyle(urgency);
                   const urgencyLabel = getUrgencyLabel(urgency);
                   const urgencyColor = getUrgencyColor(urgency);
@@ -224,7 +224,7 @@ const StaffPage: React.FC = () => {
                   </div>
                   <div className="deadline-info">
                     <div className="deadline-name">{task.title}</div>
-                    <div className="deadline-sub">{getUrgencyLabel(calculateUrgency(task.deadline))} Priority</div>
+                    <div className="deadline-sub">{getUrgencyLabel(calculateUrgency(task))} Priority</div>
                   </div>
                 </div>
               ))

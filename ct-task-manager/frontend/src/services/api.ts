@@ -73,6 +73,7 @@ export interface TaskComment {
     email?: string;
   };
   message: string;
+  channel?: 'super_admin' | 'staff' | 'general';
   attachments?: any[];
   readBy?: string[];
   readAt?: string | null;
@@ -99,6 +100,7 @@ export interface Task {
   attachments?: string[];
   completionAttachments?: string[];
   requiredCompletionExtensions?: string[];
+  submittedAt?: string | null;
   completedAt?: string | null;
   rating?: number | null;
   feedback?: string | null;
@@ -564,17 +566,19 @@ export const api = {
     return fetchWithAuth(`/api/tasks/${taskId}/comments`);
   },
 
-  addTaskComment: async (taskId: string, message: string): Promise<{ success: boolean; data: TaskComment[]; message: string }> => {
+  addTaskComment: async (taskId: string, message: string, channel?: string): Promise<{ success: boolean; data: TaskComment[]; message: string }> => {
     return fetchWithAuth(`/api/tasks/${taskId}/comments`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message }),
+      body: JSON.stringify({ message, channel }),
     });
   },
 
-  markTaskCommentsRead: async (taskId: string): Promise<{ success: boolean; message: string }> => {
+  markTaskCommentsRead: async (taskId: string, channel?: string): Promise<{ success: boolean; message: string }> => {
     return fetchWithAuth(`/api/tasks/${taskId}/comments/read`, {
       method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ channel }),
     });
   }
 };

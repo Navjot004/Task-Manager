@@ -125,7 +125,7 @@ const TasksPage: React.FC = () => {
     // Priority/Color filter (client-side based on urgency calculation)
     if (priorityFilter !== 'All') {
       filtered = filtered.filter(t => {
-        const urgency = calculateUrgency(t.deadline);
+        const urgency = calculateUrgency(t);
         return urgency === priorityFilter;
       });
     }

@@ -22,15 +22,15 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, currentUser, onClick, onCreat
   }, [task._id, task.isSubtask]);
 
   const isCompleted = task.status === 'completed' || task.status === 'approved';
+  const isSubmitted = task.status === 'submitted_for_review';
   
-  // Very simplistic overdue check just for visual effect in mockup
-  const isOverdue = !isCompleted && new Date(task.deadline).getTime() < new Date().getTime();
-
-  // Calculate urgency from deadline
-  const urgency = calculateUrgency(task.deadline);
+  // Calculate urgency from deadline (frozen at submission/completion if submitted/completed)
+  const urgency = calculateUrgency(task);
   const cardStyle = getUrgencyCardStyle(urgency);
   const urgencyLabel = getUrgencyLabel(urgency);
   const urgencyColor = getUrgencyColor(urgency);
+
+  const isOverdue = !isCompleted && !isSubmitted && urgency === 'OVERDUE';
 
   // Status pill styling
   let pillClass = 'tc-pill-gray';
@@ -202,18 +202,23 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, currentUser, onClick, onCreat
         <div className="tc-footer-section">
           <span className="tc-footer-label">Assignee</span>
           <div className="tc-assignee">
-            <div className="tc-avatar">
-              {(task.delegatedTo && currentUser?.role !== 'super_admin') ? (
-                <img src={`https://ui-avatars.com/api/?name=${encodeURIComponent(task.delegatedTo.name)}&background=e2e8f0&color=0f172a`} alt="avatar" title={`Delegated to ${task.delegatedTo.name}`} />
-              ) : task.assignedTo?.name ? (
-                <img src={`https://ui-avatars.com/api/?name=${encodeURIComponent(task.assignedTo.name)}&background=e2e8f0&color=0f172a`} alt="avatar" title={`Assigned to ${task.assignedTo.name}`} />
-              ) : '?'}
-            </div>
-            <span className="tc-assignee-id">
-              {(task.delegatedTo && currentUser?.role !== 'super_admin') ? 
-                (task.delegatedTo.employeeId || task.delegatedTo.name.substring(0, 8)) : 
-                (task.assignedTo ? task.assignedTo.employeeId || task.assignedTo.name.substring(0, 8) : 'Unassigned')}
-            </span>
+            {(() => {
+              const isSuperAdmin = currentUser?.role === 'super_admin';
+              const showDelegated = Boolean(task.delegatedTo?.name && !isSuperAdmin);
+              const displayAssignee = showDelegated ? task.delegatedTo : task.assignedTo;
+              return (
+                <>
+                  <div className="tc-avatar">
+                    {displayAssignee?.name ? (
+                      <img src={`https://ui-avatars.com/api/?name=${encodeURIComponent(displayAssignee.name)}&background=e2e8f0&color=0f172a`} alt="avatar" title={`Assigned to ${displayAssignee.name}`} />
+                    ) : '?'}
+                  </div>
+                  <span className="tc-assignee-id">
+                    {displayAssignee ? (displayAssignee.universityId || displayAssignee.name?.substring(0, 10)) : 'Unassigned'}
+                  </span>
+                </>
+              );
+            })()}
           </div>
         </div>
         

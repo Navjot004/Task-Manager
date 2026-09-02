@@ -2,24 +2,62 @@ import React from 'react';
 
 export type Urgency = 'RED' | 'YELLOW' | 'GREEN' | 'OVERDUE';
 
+export interface TaskUrgencyInput {
+  deadline: string;
+  status?: string;
+  submittedAt?: string | Date | null;
+  completedAt?: string | Date | null;
+  updatedAt?: string | Date | null;
+}
+
 /**
  * Calculates task urgency dynamically based on the deadline.
+ * If task is submitted or completed, the calculation is frozen at the submission/completion date.
  * Rules:
  *  - 0-5 days remaining: RED
  *  - 6-10 days remaining: YELLOW
  *  - 11+ days remaining: GREEN
  *  - passed: OVERDUE
  */
-export const calculateUrgency = (deadlineString: string): Urgency => {
+export const calculateUrgency = (
+  taskOrDeadline: TaskUrgencyInput | string,
+  status?: string,
+  submittedOrCompletedAt?: string | Date | null
+): Urgency => {
+  let deadlineString = '';
+  let taskStatus = status;
+  let freezeDate = submittedOrCompletedAt;
+
+  if (typeof taskOrDeadline === 'object' && taskOrDeadline !== null) {
+    deadlineString = taskOrDeadline.deadline;
+    taskStatus = taskOrDeadline.status;
+    freezeDate = taskOrDeadline.submittedAt || taskOrDeadline.completedAt || taskOrDeadline.updatedAt;
+  } else {
+    deadlineString = taskOrDeadline;
+  }
+
+  if (!deadlineString) return 'GREEN';
+
   const deadline = new Date(deadlineString);
-  const now = new Date();
+  let comparisonDate = new Date();
 
-  // Reset time to start of day for pure date difference (optional, but consistent with day counting)
+  // If task has been submitted or completed, freeze comparison date at the submission/completion time
+  if (
+    taskStatus === 'submitted_for_review' ||
+    taskStatus === 'completed' ||
+    taskStatus === 'approved'
+  ) {
+    if (freezeDate) {
+      comparisonDate = new Date(freezeDate);
+    }
+  }
+
+  // Reset time to start of day for pure date difference
   deadline.setHours(0, 0, 0, 0);
-  const today = new Date(now);
-  today.setHours(0, 0, 0, 0);
+  const compDay = new Date(comparisonDate);
+  compDay.setHours(0, 0, 0, 0);
 
-  const diffTime = deadline.getTime() - today.getTime();
+  const diffTime = deadline.getTime() - compDay.getTime();
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
   if (diffDays < 0) {

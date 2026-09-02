@@ -235,7 +235,7 @@ const SuperAdminPage = () => {
           <div className="sa-review-list">
             {tasksAwaitingReview.length > 0 ? (
               tasksAwaitingReview.map(task => {
-                const urgency = calculateUrgency(task.deadline);
+                const urgency = calculateUrgency(task);
                 const cardStyle = getUrgencyCardStyle(urgency);
                 const urgencyColor = getUrgencyColor(urgency);
                 
@@ -402,7 +402,7 @@ const SuperAdminPage = () => {
               <tbody>
                 {filteredRecentTasks.length > 0 ? (
                   filteredRecentTasks.map(task => {
-                    const urgency = calculateUrgency(task.deadline);
+                    const urgency = calculateUrgency(task);
                     const cardStyle = getUrgencyCardStyle(urgency);
                     
                     return (

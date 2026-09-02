@@ -20,6 +20,7 @@ export interface ITask extends Document {
   attachments: mongoose.Types.ObjectId[];
   completionAttachments: mongoose.Types.ObjectId[];
   requiredCompletionExtensions: string[];
+  submittedAt?: Date | null;
   completedAt: Date | null;
   rating?: number | null;
   feedback?: string | null;
@@ -30,6 +31,7 @@ export interface ITask extends Document {
     _id?: mongoose.Types.ObjectId;
     sender: mongoose.Types.ObjectId;
     message: string;
+    channel?: 'super_admin' | 'staff' | 'general';
     attachments?: mongoose.Types.ObjectId[];
     readBy?: mongoose.Types.ObjectId[];
     readAt?: Date | null;
@@ -132,6 +134,10 @@ const taskSchema = new Schema<ITask>(
       type: String,
       default: []
     }],
+    submittedAt: {
+      type: Date,
+      default: null
+    },
     completedAt: {
       type: Date,
       default: null
@@ -173,6 +179,11 @@ const taskSchema = new Schema<ITask>(
           required: true,
           trim: true,
           maxlength: 3000
+        },
+        channel: {
+          type: String,
+          enum: ['super_admin', 'staff', 'general'],
+          default: 'general'
         },
         attachments: [{
           type: Schema.Types.ObjectId,

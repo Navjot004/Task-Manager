@@ -47,7 +47,7 @@ const AdminPage: React.FC = () => {
   const completionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
   
   const activeTasks = tasks.filter(t => t.status !== 'completed' && t.status !== 'approved');
-  const highPriorityTasks = activeTasks.filter(t => calculateUrgency(t.deadline) === 'RED' || calculateUrgency(t.deadline) === 'OVERDUE');
+  const highPriorityTasks = activeTasks.filter(t => calculateUrgency(t) === 'RED' || calculateUrgency(t) === 'OVERDUE');
   const pendingReviewTasks = tasks.filter(t => t.status === 'submitted_for_review' && t.reviewStage === 'department_admin');
   
   return (
@@ -119,7 +119,7 @@ const AdminPage: React.FC = () => {
               <p style={{ padding: '1rem', color: '#64748b' }}>No tasks.</p>
             ) : (
               tasks.slice(0, 5).map(task => {
-                const urgency = calculateUrgency(task.deadline);
+                const urgency = calculateUrgency(task);
                 const cardStyle = getUrgencyCardStyle(urgency);
                 const urgencyLabel = getUrgencyLabel(urgency);
                 const urgencyColor = getUrgencyColor(urgency);

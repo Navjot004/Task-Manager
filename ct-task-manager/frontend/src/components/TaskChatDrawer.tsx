@@ -35,6 +35,16 @@ const TaskChatDrawer: React.FC<TaskChatDrawerProps> = ({
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // 3-Tier Hierarchy tab state for Department Admin
+  const isDeptAdmin = currentUser?.role === 'department_admin';
+  const isThreeTier = Boolean(
+    task?.delegatedTo && 
+    task?.assignedTo && 
+    (task.delegatedTo._id || task.delegatedTo) !== (task.assignedTo._id || task.assignedTo)
+  );
+  const showTabs = isThreeTier && isDeptAdmin;
+  const [activeTab, setActiveTab] = useState<'super_admin' | 'staff'>('super_admin');
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -82,12 +92,19 @@ const TaskChatDrawer: React.FC<TaskChatDrawerProps> = ({
     }
   }, [isOpen, task?._id]);
 
-  // Scroll to bottom when comments list updates
+  // Scroll to bottom when comments list updates or tab changes
   useEffect(() => {
     if (comments.length > 0) {
       scrollToBottom();
     }
-  }, [comments.length]);
+  }, [comments.length, activeTab]);
+
+  // Mark comments read on tab change for Dept Admin
+  useEffect(() => {
+    if (isOpen && task?._id && showTabs) {
+      api.markTaskCommentsRead(task._id, activeTab);
+    }
+  }, [activeTab, isOpen, task?._id, showTabs]);
 
   // Auto-expand textarea height
   const adjustTextareaHeight = () => {
@@ -113,8 +130,12 @@ const TaskChatDrawer: React.FC<TaskChatDrawerProps> = ({
     setSending(true);
     setError(null);
 
+    const channelToSend = showTabs 
+      ? activeTab 
+      : (currentUser?.role === 'super_admin' ? 'super_admin' : currentUser?.role === 'staff' ? 'staff' : 'general');
+
     try {
-      const res = await api.addTaskComment(task._id, messageText);
+      const res = await api.addTaskComment(task._id, messageText, channelToSend);
       if (res.success) {
         setComments(res.data);
         setNewMessage('');
@@ -208,24 +229,90 @@ const TaskChatDrawer: React.FC<TaskChatDrawerProps> = ({
   const myUnivId = currentUser?.universityId?.toString();
 
   const creator: any = task.createdBy;
-  const assignee: any = task.delegatedTo || task.assignedTo;
+  const isSuperAdmin = currentUser?.role === 'super_admin';
+  const assignee: any = isSuperAdmin ? task.assignedTo : (task.delegatedTo || task.assignedTo);
 
   const isMeCreator = Boolean(creator && (
     (creator._id || creator.id)?.toString() === myId ||
     (creator.universityId && creator.universityId === myUnivId)
   ));
 
-  let counterpart: any = isMeCreator ? assignee : creator;
-  if (!counterpart && assignee && ((assignee._id || assignee.id)?.toString() !== myId)) {
-    counterpart = assignee;
-  } else if (!counterpart && creator && ((creator._id || creator.id)?.toString() !== myId)) {
-    counterpart = creator;
+  // Filtered comments for the current tab/view
+  const displayedComments = showTabs 
+    ? comments.filter(c => {
+        if (c.channel) return c.channel === activeTab;
+        if (activeTab === 'super_admin') {
+          return c.sender?.role === 'super_admin' || c.sender?.role === 'department_admin';
+        } else {
+          return c.sender?.role === 'staff';
+        }
+      })
+    : comments;
+
+  // Unread counts for tabs
+  const unreadSuperAdminCount = comments.filter(c => {
+    const isChannel = c.channel ? c.channel === 'super_admin' : c.sender?.role === 'super_admin';
+    const isNotMe = (c.sender?._id || (c.sender as any))?.toString() !== myId;
+    const isUnread = !c.readBy || !c.readBy.some((uid: any) => (uid?._id || uid)?.toString() === myId);
+    return isChannel && isNotMe && isUnread;
+  }).length;
+
+  const unreadStaffCount = comments.filter(c => {
+    const isChannel = c.channel ? c.channel === 'staff' : c.sender?.role === 'staff';
+    const isNotMe = (c.sender?._id || (c.sender as any))?.toString() !== myId;
+    const isUnread = !c.readBy || !c.readBy.some((uid: any) => (uid?._id || uid)?.toString() === myId);
+    return isChannel && isNotMe && isUnread;
+  }).length;
+
+  let counterpart: any = null;
+  let counterpartLabel = 'Talking with:';
+
+  if (showTabs) {
+    if (activeTab === 'super_admin') {
+      counterpart = creator;
+      counterpartLabel = 'Talking with Super Admin:';
+    } else {
+      counterpart = task.delegatedTo;
+      counterpartLabel = 'Talking with Staff:';
+    }
+  } else if (currentUser?.role === 'super_admin') {
+    counterpart = task.assignedTo;
+  } else if (currentUser?.role === 'staff') {
+    counterpart = task.assignedTo || creator;
+  } else {
+    counterpart = isMeCreator ? assignee : creator;
   }
 
-  const counterpartName = counterpart?.name || (isMeCreator ? (task.delegatedTo ? 'Delegated Staff' : 'Department Admin') : 'Super Admin');
+  const counterpartName = counterpart?.name || (showTabs 
+    ? (activeTab === 'super_admin' ? 'Super Admin' : (task.delegatedTo?.name || 'Staff Member'))
+    : (isMeCreator ? (task.delegatedTo?.name || 'Department Admin') : 'Super Admin'));
   const counterpartId = counterpart?.universityId || counterpart?.employeeId || '';
-  const counterpartRole = counterpart?.role || (isMeCreator ? (task.delegatedTo ? 'staff' : 'department_admin') : 'super_admin');
+  const counterpartRole = counterpart?.role || (showTabs
+    ? (activeTab === 'super_admin' ? 'super_admin' : 'staff')
+    : (isMeCreator ? 'staff' : 'super_admin'));
   const counterpartRoleBadge = getRoleBadge(counterpartRole);
+
+  const quickSuggestions = showTabs
+    ? (activeTab === 'super_admin'
+        ? [
+            'Sir, this task is in progress with our departmental staff.',
+            'Files have been submitted for your review. Please verify.',
+            'Working on this with priority, will ensure on-time delivery.',
+            'Need a brief extension for compliance verification.'
+          ]
+        : [
+            'Please submit the required documents before deadline.',
+            'Format looks good, please proceed with completion upload.',
+            'Please check the guidelines and revise the document.',
+            'Any blockers in completing this task?'
+          ]
+      )
+    : [
+        'Sir, files have been uploaded for review. Please check.',
+        'Working on this task, will submit before deadline.',
+        'Need clarification regarding the required format.',
+        'Understood, will complete this promptly.'
+      ];
 
   return (
     <div className="task-chat-drawer-overlay" onClick={onClose}>
@@ -243,7 +330,7 @@ const TaskChatDrawer: React.FC<TaskChatDrawerProps> = ({
               {task.title}
             </h2>
             <div className="task-chat-counterpart">
-              <span className="counterpart-label">Talking with:</span>
+              <span className="counterpart-label">{counterpartLabel}</span>
               <div className="counterpart-chip">
                 {counterpartRoleBadge.icon}
                 <span className="counterpart-name">
@@ -272,10 +359,50 @@ const TaskChatDrawer: React.FC<TaskChatDrawerProps> = ({
           </div>
         </div>
 
+        {/* 3-Tier Chat Tabs for Department Admin */}
+        {showTabs && (
+          <div className="task-chat-tabs">
+            <button 
+              type="button"
+              className={`task-chat-tab-btn ${activeTab === 'super_admin' ? 'active' : ''}`}
+              onClick={() => {
+                setActiveTab('super_admin');
+                setTimeout(() => scrollToBottom(false), 50);
+              }}
+            >
+              <Shield size={14} />
+              <span>Super Admin ({creator?.name ? creator.name.split(' ')[0] : 'Admin'})</span>
+              {unreadSuperAdminCount > 0 && (
+                <span className="task-chat-tab-badge">{unreadSuperAdminCount}</span>
+              )}
+            </button>
+            <button 
+              type="button"
+              className={`task-chat-tab-btn ${activeTab === 'staff' ? 'active' : ''}`}
+              onClick={() => {
+                setActiveTab('staff');
+                setTimeout(() => scrollToBottom(false), 50);
+              }}
+            >
+              <UserIcon size={14} />
+              <span>Staff ({task.delegatedTo?.name ? task.delegatedTo.name.split(' ')[0] : 'Staff'})</span>
+              {unreadStaffCount > 0 && (
+                <span className="task-chat-tab-badge">{unreadStaffCount}</span>
+              )}
+            </button>
+          </div>
+        )}
+
         {/* Quick Help Banner */}
         <div className="task-chat-context-banner">
           <MessageSquare size={13} className="banner-icon" />
-          <span>Task-specific direct discussion between Assignor and Assignee.</span>
+          <span>
+            {showTabs 
+              ? (activeTab === 'super_admin' 
+                  ? 'Private thread with Super Admin (Staff cannot see this).' 
+                  : `Internal thread with ${task.delegatedTo?.name || 'Staff'} (Super Admin cannot see this).`)
+              : 'Task-specific direct discussion.'}
+          </span>
         </div>
 
         {/* Chat Messages Body */}
@@ -285,41 +412,38 @@ const TaskChatDrawer: React.FC<TaskChatDrawerProps> = ({
               <RefreshCw size={24} className="spinning" />
               <p>Loading discussion...</p>
             </div>
-          ) : comments.length === 0 ? (
+          ) : displayedComments.length === 0 ? (
             <div className="task-chat-empty-state">
               <div className="empty-icon-circle">
                 <MessageSquare size={28} />
               </div>
-              <h3>No Messages Yet</h3>
-              <p>Have questions or updates regarding this task? Start the discussion below.</p>
+              <h3>No Messages in this Thread</h3>
+              <p>
+                {showTabs && activeTab === 'super_admin'
+                  ? 'Discuss task progress or questions directly with Super Admin.'
+                  : showTabs && activeTab === 'staff'
+                  ? `Give instructions or updates directly to ${task.delegatedTo?.name || 'Staff'}.`
+                  : 'Have questions or updates regarding this task? Start the discussion below.'}
+              </p>
               
               <div className="task-chat-quick-suggestions">
                 <div className="suggestion-label">
                   <Sparkles size={12} /> Quick Messages:
                 </div>
-                <button 
-                  className="suggestion-pill"
-                  onClick={() => handleQuickSuggestion('Sir, files have been uploaded for review. Please check.')}
-                >
-                  "Uploaded files for review"
-                </button>
-                <button 
-                  className="suggestion-pill"
-                  onClick={() => handleQuickSuggestion('Working on this task, will submit before deadline.')}
-                >
-                  "In progress, submitting soon"
-                </button>
-                <button 
-                  className="suggestion-pill"
-                  onClick={() => handleQuickSuggestion('Need clarification regarding the required format.')}
-                >
-                  "Need format clarification"
-                </button>
+                {quickSuggestions.map((text, idx) => (
+                  <button 
+                    key={idx}
+                    className="suggestion-pill"
+                    onClick={() => handleQuickSuggestion(text)}
+                  >
+                    "{text}"
+                  </button>
+                ))}
               </div>
             </div>
           ) : (
             <div className="task-chat-message-list">
-              {comments.map((msg, index) => {
+              {displayedComments.map((msg, index) => {
                 const myId = (currentUser?._id || currentUser?.id)?.toString();
                 const myUnivId = currentUser?.universityId?.toString();
                 const myEmail = currentUser?.email?.toLowerCase();
@@ -344,8 +468,8 @@ const TaskChatDrawer: React.FC<TaskChatDrawerProps> = ({
                 );
 
                 const isLastMyMessage = isMe && (
-                  index === comments.length - 1 ||
-                  !comments.slice(index + 1).some(m => {
+                  index === displayedComments.length - 1 ||
+                  !displayedComments.slice(index + 1).some(m => {
                     const mSender: any = m.sender;
                     const mSenderId = (mSender?._id || mSender?.id || m.sender)?.toString();
                     return mSenderId === myId;
@@ -353,7 +477,7 @@ const TaskChatDrawer: React.FC<TaskChatDrawerProps> = ({
                 );
 
                 // Check if date separator is needed
-                const showDate = index === 0 || formatDateLabel(comments[index - 1].createdAt) !== formatDateLabel(msg.createdAt);
+                const showDate = index === 0 || formatDateLabel(displayedComments[index - 1].createdAt) !== formatDateLabel(msg.createdAt);
 
                 return (
                   <React.Fragment key={msg._id || index}>
@@ -430,7 +554,10 @@ const TaskChatDrawer: React.FC<TaskChatDrawerProps> = ({
             <textarea
               ref={inputRef}
               className="task-chat-textarea"
-              placeholder="Type a message... (Enter to send, Shift+Enter for newline)"
+              placeholder={showTabs 
+                ? (activeTab === 'super_admin' ? 'Message Super Admin... (Enter to send)' : `Message ${task.delegatedTo?.name ? task.delegatedTo.name.split(' ')[0] : 'Staff'}... (Enter to send)`)
+                : 'Type a message... (Enter to send, Shift+Enter for newline)'
+              }
               value={newMessage}
               onChange={handleTextChange}
               onKeyDown={handleKeyDown}

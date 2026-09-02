@@ -321,14 +321,34 @@ const TaskModal: React.FC<TaskModalProps> = ({ task: initialTask, onClose, onRef
     );
   };
   
-  const canPerformStaffActions = (currentUser.role === 'staff' && ((task.assignedTo && task.assignedTo._id === currentUser.id) || (task.delegatedTo && task.delegatedTo._id === currentUser.id))) ||
-    (currentUser.role === 'department_admin' && task.assignedTo && task.assignedTo._id === currentUser.id);
+  const currentUserId = currentUser.id || currentUser._id;
+  const isAssignedStaff = currentUser.role === 'staff' && Boolean(
+    (task.assignedTo && (task.assignedTo._id === currentUserId || task.assignedTo.id === currentUserId || task.assignedTo === currentUserId)) ||
+    (task.delegatedTo && (task.delegatedTo._id === currentUserId || task.delegatedTo.id === currentUserId || task.delegatedTo === currentUserId))
+  );
+  const isPerformerAdmin = currentUser.role === 'department_admin' && !task.delegatedTo && Boolean(
+    task.assignedTo && (task.assignedTo._id === currentUserId || task.assignedTo.id === currentUserId || task.assignedTo === currentUserId)
+  );
+  const canPerformStaffActions = isAssignedStaff || isPerformerAdmin;
+
+  const isCreator = Boolean(
+    (task.createdBy?._id && (task.createdBy._id === currentUser.id || task.createdBy._id === currentUser._id)) ||
+    (task.createdBy?.id && (task.createdBy.id === currentUser.id || task.createdBy.id === currentUser._id)) ||
+    (typeof task.createdBy === 'string' && (task.createdBy === currentUser.id || task.createdBy === currentUser._id))
+  );
+
+  const canRateOnApproval = currentUser.role === 'super_admin' || (currentUser.role === 'department_admin' && isCreator);
 
   const canReview = 
     task.status === 'submitted_for_review' && (
       currentUser.role === 'super_admin' ||
-      (task.reviewStage === 'department_admin' && currentUser.role === 'department_admin' && task.currentReviewer && 
-       (task.currentReviewer === currentUser.id || task.currentReviewer._id === currentUser.id))
+      (task.reviewStage === 'department_admin' && currentUser.role === 'department_admin' && (
+        !task.currentReviewer || 
+        task.currentReviewer === currentUser.id || 
+        task.currentReviewer?._id === currentUser.id || 
+        task.currentReviewer?._id === currentUser._id ||
+        isCreator
+      ))
     );
 
   const handleUpdate = async () => {
@@ -447,7 +467,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ task: initialTask, onClose, onRef
     }
   };
 
-  const urgency = calculateUrgency(task.deadline);
+  const urgency = calculateUrgency(task);
 
   const getStatusColor = (status: string) => {
     switch(status) {
@@ -559,16 +579,29 @@ const TaskModal: React.FC<TaskModalProps> = ({ task: initialTask, onClose, onRef
                 <div style={{ fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 600, marginBottom: '0.25rem' }}>Created By</div>
                 <div style={{ fontWeight: 500, color: '#0f172a' }}>{formatName(task.createdBy)}</div>
               </div>
-              <div>
-                <div style={{ fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 600, marginBottom: '0.25rem' }}>Assigned To</div>
-                <div style={{ fontWeight: 500, color: '#0f172a' }}>{formatName(task.assignedTo)}</div>
-              </div>
-              
-              {task.delegatedTo && currentUser.role !== 'super_admin' && (
+              {currentUser.role === 'super_admin' ? (
                 <div>
-                  <div style={{ fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 600, marginBottom: '0.25rem' }}>Delegated To</div>
-                  <div style={{ fontWeight: 500, color: '#0f172a' }}>{formatName(task.delegatedTo)}</div>
+                  <div style={{ fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 600, marginBottom: '0.25rem' }}>Assigned To</div>
+                  <div style={{ fontWeight: 500, color: '#0f172a' }}>{formatName(task.assignedTo)}</div>
                 </div>
+              ) : (
+                <>
+                  <div>
+                    <div style={{ fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 600, marginBottom: '0.25rem' }}>
+                      {task.delegatedTo ? 'Assigned Staff' : 'Assigned To'}
+                    </div>
+                    <div style={{ fontWeight: 500, color: '#0f172a' }}>
+                      {task.delegatedTo ? formatName(task.delegatedTo) : formatName(task.assignedTo)}
+                    </div>
+                  </div>
+                  
+                  {task.delegatedTo && (
+                    <div>
+                      <div style={{ fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase', fontWeight: 600, marginBottom: '0.25rem' }}>Assigned Dept Admin</div>
+                      <div style={{ fontWeight: 500, color: '#0f172a' }}>{formatName(task.assignedTo)}</div>
+                    </div>
+                  )}
+                </>
               )}
               
               {/* Completion Date */}
@@ -699,8 +732,8 @@ const TaskModal: React.FC<TaskModalProps> = ({ task: initialTask, onClose, onRef
               </div>
             )}
 
-            {/* Super Admin Approval & Performance Rating Prompt */}
-            {isApproving && (
+            {/* Super Admin & Department Admin (Creator) Approval & Performance Rating Prompt */}
+            {isApproving && canRateOnApproval && (
               <div style={{ backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', padding: '1.25rem', borderRadius: '8px', margin: '1rem 0' }}>
                 <h4 style={{ margin: '0 0 0.25rem 0', color: '#166534', fontSize: '1rem', fontWeight: 700 }}>
                   Approve Task & Rate Performance
@@ -714,32 +747,47 @@ const TaskModal: React.FC<TaskModalProps> = ({ task: initialTask, onClose, onRef
                   <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: '#166534', letterSpacing: '0.05em', marginBottom: '0.4rem' }}>
                     Star Rating (1 to 5 Stars)
                   </label>
-                  <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                  <div 
+                    style={{ display: 'flex', gap: '0.2rem', alignItems: 'center' }}
+                    onMouseLeave={() => setHoverRating(0)}
+                  >
                     {[1, 2, 3, 4, 5].map((star) => {
-                      const isFilled = (hoverRating || reviewRating) >= star;
+                      const activeValue = hoverRating || reviewRating || 0;
+                      const isFilled = activeValue >= star;
+                      const isHoveredTarget = hoverRating === star;
                       return (
                         <button
                           key={star}
                           type="button"
                           onClick={() => setReviewRating(star)}
                           onMouseEnter={() => setHoverRating(star)}
-                          onMouseLeave={() => setHoverRating(0)}
                           style={{
                             background: 'transparent',
                             border: 'none',
                             cursor: 'pointer',
-                            padding: '2px',
+                            padding: '0',
+                            width: '32px',
+                            height: '32px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
                             color: isFilled ? '#eab308' : '#cbd5e1',
-                            transition: 'transform 0.15s ease',
-                            transform: isFilled ? 'scale(1.15)' : 'scale(1)',
                           }}
                         >
-                          <Star size={28} fill={isFilled ? '#eab308' : 'none'} />
+                          <Star 
+                            size={26} 
+                            fill={isFilled ? '#eab308' : 'none'} 
+                            style={{
+                              pointerEvents: 'none',
+                              transition: 'transform 0.12s ease, fill 0.12s ease, color 0.12s ease',
+                              transform: isHoveredTarget ? 'scale(1.2)' : isFilled ? 'scale(1.05)' : 'scale(1)',
+                            }}
+                          />
                         </button>
                       );
                     })}
                     <span style={{ marginLeft: '0.5rem', fontWeight: 700, fontSize: '0.95rem', color: '#854d0e' }}>
-                      {reviewRating} / 5 Stars
+                      {hoverRating || reviewRating || 0} / 5 Stars
                     </span>
                   </div>
                 </div>
@@ -939,7 +987,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ task: initialTask, onClose, onRef
                       className="btn btn-success" 
                       style={{ backgroundColor: '#10b981', color: 'white', fontWeight: 600, padding: '0.6rem 1.25rem' }} 
                       onClick={() => {
-                        if (currentUser.role === 'super_admin' || (currentUser.role === 'department_admin' && (task.createdBy?._id === currentUser.id || task.createdBy?.id === currentUser.id))) {
+                        if (canRateOnApproval) {
                           setIsApproving(true);
                         } else {
                           handleReviewAction('approved');
@@ -947,7 +995,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ task: initialTask, onClose, onRef
                       }} 
                       disabled={loading}
                     >
-                      {currentUser.role === 'department_admin' && task.reviewStage === 'department_admin' && (task.createdBy?._id !== currentUser.id && task.createdBy?.id !== currentUser.id) ? 'Approve & Send to Super Admin' : 'Approve'}
+                      {currentUser.role === 'department_admin' && !isCreator ? 'Approve & Send to Super Admin' : 'Approve'}
                     </button>
                     <button 
                       className="btn btn-danger" 

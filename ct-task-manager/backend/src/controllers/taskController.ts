@@ -341,12 +341,22 @@ export const getTaskById = async (req: Request, res: Response) => {
         allowed = true;
       }
     } else if (user.role === 'staff') {
-      allowed = !!(task.assignedTo && task.assignedTo._id.toString() === user._id.toString());
+      allowed = Boolean(
+        (task.assignedTo && (task.assignedTo._id?.toString() === user._id.toString() || task.assignedTo.toString() === user._id.toString())) ||
+        (task.delegatedTo && (task.delegatedTo._id?.toString() === user._id.toString() || task.delegatedTo.toString() === user._id.toString()))
+      );
     } else if (user.role === 'department_admin') {
-      if (task.createdBy._id.toString() === user._id.toString()) allowed = true;
-      else if (task.assignedTo && task.assignedTo._id.toString() === user._id.toString()) allowed = true;
+      if (task.createdBy._id?.toString() === user._id.toString() || task.createdBy.toString() === user._id.toString()) allowed = true;
+      else if (task.assignedTo && (task.assignedTo._id?.toString() === user._id.toString() || task.assignedTo.toString() === user._id.toString())) allowed = true;
+      else if (task.delegatedTo && (task.delegatedTo._id?.toString() === user._id.toString() || task.delegatedTo.toString() === user._id.toString())) allowed = true;
       else if (task.assignedTo) {
-        const hasPerm = await checkAdminStaffPermission(user._id.toString(), task.assignedTo._id.toString());
+        const staffId = task.assignedTo._id ? task.assignedTo._id.toString() : task.assignedTo.toString();
+        const hasPerm = await checkAdminStaffPermission(user._id.toString(), staffId);
+        if (hasPerm) allowed = true;
+      }
+      if (!allowed && task.delegatedTo) {
+        const staffId = task.delegatedTo._id ? task.delegatedTo._id.toString() : task.delegatedTo.toString();
+        const hasPerm = await checkAdminStaffPermission(user._id.toString(), staffId);
         if (hasPerm) allowed = true;
       }
     }
@@ -470,14 +480,21 @@ export const assignTask = async (req: Request, res: Response) => {
         task.workflowType = 'department_admin';
       }
 
-      // Delegation logic
-      if (
+      // Delegation / Assignment logic
+      const isCreator = task.createdBy.toString() === user._id.toString();
+
+      if (user.role === 'department_admin' && isCreator) {
+        // If Dept Admin created the task, assign directly to target staff (Dept Admin is creator, not assignee)
+        task.assignedTo = assignedTo;
+        task.delegatedTo = null;
+      } else if (
         user.role === 'department_admin' && 
         task.assignedTo && 
         task.assignedTo.toString() === user._id.toString() && 
         targetUser.role === 'staff'
       ) {
-        task.delegatedTo = assignedTo; // Delegate to staff
+        // Super admin created task assigned to Dept Admin: delegate to staff
+        task.delegatedTo = assignedTo;
       } else {
         task.assignedTo = assignedTo; // Normal assignment
         task.delegatedTo = null; // Clear delegation if any
@@ -489,6 +506,9 @@ export const assignTask = async (req: Request, res: Response) => {
     const populatedTask = await Task.findById(task._id)
       .populate('createdBy', 'name role universityId')
       .populate('assignedTo', 'name role department universityId')
+      .populate('delegatedTo', 'name role department universityId')
+      .populate('ratedBy', 'name role universityId')
+      .populate('ratedUser', 'name role department universityId')
       .populate('parentTaskId', 'taskId title');
 
     return res.status(200).json({ success: true, data: { task: populatedTask } });
@@ -514,14 +534,19 @@ export const updateTaskStatus = async (req: Request, res: Response) => {
 
     // Authorization
     if (user.role === 'staff') {
-      if (!task.assignedTo || task.assignedTo.toString() !== user._id.toString()) {
+      const isAssigned = 
+        (task.assignedTo && task.assignedTo.toString() === user._id.toString()) ||
+        (task.delegatedTo && task.delegatedTo.toString() === user._id.toString());
+      if (!isAssigned) {
         return res.status(403).json({ success: false, message: 'Forbidden. Can only change status of your assigned tasks.' });
       }
     } else if (user.role === 'department_admin') {
       const canChange = 
         task.createdBy.toString() === user._id.toString() ||
         (task.assignedTo && task.assignedTo.toString() === user._id.toString()) ||
-        (task.assignedTo && await checkAdminStaffPermission(user._id.toString(), task.assignedTo.toString()));
+        (task.delegatedTo && task.delegatedTo.toString() === user._id.toString()) ||
+        (task.assignedTo && await checkAdminStaffPermission(user._id.toString(), task.assignedTo.toString())) ||
+        (task.delegatedTo && await checkAdminStaffPermission(user._id.toString(), task.delegatedTo.toString()));
         
       if (!canChange) {
         return res.status(403).json({ success: false, message: 'Forbidden. Cannot change status of this task.' });
@@ -561,7 +586,10 @@ export const submitReview = async (req: Request, res: Response) => {
     
     if (!task) return res.status(404).json({ success: false, message: 'Task not found' });
     
-    if (!task.assignedTo || task.assignedTo.toString() !== user._id.toString()) {
+    const isPerformer = 
+      (task.assignedTo && task.assignedTo.toString() === user._id.toString()) ||
+      (task.delegatedTo && task.delegatedTo.toString() === user._id.toString());
+    if (!isPerformer) {
       return res.status(403).json({ success: false, message: 'Forbidden. Only the assignee can submit a task for review.' });
     }
 
@@ -621,26 +649,26 @@ export const submitReview = async (req: Request, res: Response) => {
 
     task.completionAttachments = [...(task.completionAttachments || []), ...attachmentIds];
     task.status = 'submitted_for_review';
+    task.submittedAt = new Date();
     task.reviewRequestedBy = user._id;
+
+    const creator = await User.findById(task.createdBy);
+    const isCreatorSuperAdmin = Boolean(creator && creator.role === 'super_admin');
 
     if (task.isSubtask) {
       // Subtasks go directly to their creator for final review
-      const creator = await User.findById(task.createdBy);
       task.reviewStage = creator?.role === 'department_admin' ? 'department_admin' : 'super_admin';
       task.currentReviewer = task.createdBy;
     } else if (task.delegatedTo && task.delegatedTo.toString() === user._id.toString()) {
       // Delegated task submitted by staff: goes to Dept Admin
       task.reviewStage = 'department_admin';
       task.currentReviewer = task.assignedTo;
-    } else if (task.workflowType === 'super_admin_direct') {
-      task.reviewStage = 'super_admin';
-      task.currentReviewer = task.createdBy; 
-    } else if (task.workflowType === 'department_admin') {
-      const creator = await User.findById(task.createdBy);
-      task.reviewStage = (creator && creator.role === 'super_admin') ? 'super_admin' : 'department_admin';
+    } else if (!isCreatorSuperAdmin) {
+      // Task was created by Dept Admin -> goes directly to Dept Admin (Creator) for review & final approval
+      task.reviewStage = 'department_admin';
       task.currentReviewer = task.createdBy;
     } else {
-      // Fallback
+      // Task created by Super Admin -> goes to Super Admin
       task.reviewStage = 'super_admin';
       task.currentReviewer = task.createdBy;
     }
@@ -703,8 +731,11 @@ export const reviewTask = async (req: Request, res: Response) => {
     if (decision === 'approved') {
       let finalApproved = false;
 
-      // Subtasks are fully approved once the creator approves them
-      if (task.isSubtask && task.createdBy.toString() === user._id.toString()) {
+      const creator = await User.findById(task.createdBy);
+      const isCreatorSuperAdmin = Boolean(creator && creator.role === 'super_admin');
+
+      // 1. Super Admin is always final reviewer
+      if (user.role === 'super_admin') {
         task.status = 'approved';
         task.completedAt = new Date();
         task.reviewStage = 'none';
@@ -712,37 +743,33 @@ export const reviewTask = async (req: Request, res: Response) => {
         task.rejectionReason = null;
         finalApproved = true;
       }
-      // Multi-stage delegated task logic
-      else if (task.delegatedTo && user.role === 'department_admin') {
-        // Dept admin approved a delegated task, send to Super Admin if Super Admin created it
-        const creator = await User.findById(task.createdBy);
-        if (creator && creator.role === 'super_admin') {
-          task.reviewStage = 'super_admin';
-          task.status = 'submitted_for_review'; // Stays in review, but moved to super admin
-          task.currentReviewer = task.createdBy; 
-          task.rejectionReason = null;
-        } else {
-          // If the dept admin created it and delegated it, they are the final reviewer
-          task.status = 'approved';
-          task.completedAt = new Date();
-          task.reviewStage = 'none';
-          task.currentReviewer = null;
-          task.rejectionReason = null;
-          finalApproved = true;
-        }
-      } else if (user.role === 'super_admin') {
+      // 2. Subtasks approved by their creator
+      else if (task.isSubtask && task.createdBy.toString() === user._id.toString()) {
         task.status = 'approved';
         task.completedAt = new Date();
         task.reviewStage = 'none';
         task.currentReviewer = null;
         task.rejectionReason = null;
         finalApproved = true;
-      } else if (task.reviewStage === 'department_admin') {
+      }
+      // 3. Dept Admin approving a task THEY CREATED (or where creator is not Super Admin) -> FINAL APPROVED!
+      else if (!isCreatorSuperAdmin || task.createdBy.toString() === user._id.toString()) {
+        task.status = 'approved';
+        task.completedAt = new Date();
+        task.reviewStage = 'none';
+        task.currentReviewer = null;
+        task.rejectionReason = null;
+        finalApproved = true;
+      }
+      // 4. Delegated task that originated from Super Admin -> forward to Super Admin
+      else if (isCreatorSuperAdmin && task.delegatedTo) {
         task.reviewStage = 'super_admin';
         task.status = 'submitted_for_review'; // Stays in review, but moved to super admin
         task.currentReviewer = task.createdBy; 
         task.rejectionReason = null;
-      } else if (task.reviewStage === 'super_admin') {
+      }
+      // 5. Fallback for non-super-admin tasks
+      else {
         task.status = 'approved';
         task.completedAt = new Date();
         task.reviewStage = 'none';
@@ -753,13 +780,11 @@ export const reviewTask = async (req: Request, res: Response) => {
 
       if (finalApproved) {
         // Rating & Completer attribution:
-        // Case 1: If delegatedTo exists -> credited to that staff member
-        // Case 2: Else if reviewRequestedBy exists -> credited to that submitter
-        // Case 3: Else assignedTo -> credited to assignee
         const completerId = task.delegatedTo || task.reviewRequestedBy || task.assignedTo;
         if (completerId) {
           task.ratedUser = completerId as mongoose.Types.ObjectId;
         }
+        // Super Admin OR Department Admin (when approving their task) can give rating & feedback
         if (rating && typeof rating === 'number' && rating >= 1 && rating <= 5) {
           task.rating = rating;
           task.feedback = feedback ? String(feedback).trim() : null;
@@ -1052,12 +1077,14 @@ export const getNaacReport = async (req: Request, res: Response) => {
         { delegatedTo: { $in: allUserIdsToFetchTasks } },
         { ratedUser: { $in: allUserIdsToFetchTasks } }
       ]
-    }).select('assignedTo delegatedTo ratedUser status rating feedback completedAt deadline');
+    })
+    .select('assignedTo delegatedTo ratedUser status rating feedback completedAt deadline ratedBy')
+    .populate('ratedBy', 'role name');
 
     // 3. Process data and counts
     Object.values(deptMap).forEach((deptObj: any) => {
-      let deptRatingsSum = 0;
-      let deptRatingsCount = 0;
+      let deptSuperAdminRatingsSum = 0;
+      let deptSuperAdminRatingsCount = 0;
 
       deptObj.users.forEach((userObj: any) => {
         const userTasks = tasks.filter(t => {
@@ -1070,7 +1097,7 @@ export const getNaacReport = async (req: Request, res: Response) => {
         userObj.tasksPending = userTasks.filter(t => t.status === 'pending' || t.status === 'in_progress' || t.status === 'rejected' || t.status === 'completed').length;
         userObj.tasksInReview = userTasks.filter(t => t.status === 'submitted_for_review').length;
 
-        // User Rating calculation
+        // User Personal Rating calculation (includes ALL ratings received by the user)
         const userRatedTasks = userTasks.filter(t => t.rating && typeof t.rating === 'number' && t.rating > 0);
         userObj.totalRatings = userRatedTasks.length;
         const userRatingSum = userRatedTasks.reduce((acc, t) => acc + (t.rating || 0), 0);
@@ -1089,8 +1116,13 @@ export const getNaacReport = async (req: Request, res: Response) => {
         });
         userObj.onTimeRate = totalFinished > 0 ? Math.round((onTime / totalFinished) * 100) : 100;
 
-        deptRatingsSum += userRatingSum;
-        deptRatingsCount += userObj.totalRatings;
+        // Department Aggregate Rating: ONLY count tasks rated by a Super Admin
+        const deptSuperAdminRatedTasks = userTasks.filter(t => {
+          return t.rating && typeof t.rating === 'number' && t.rating > 0 && t.ratedBy && (t.ratedBy as any).role === 'super_admin';
+        });
+        const deptSuperAdminRatingSum = deptSuperAdminRatedTasks.reduce((acc, t) => acc + (t.rating || 0), 0);
+        deptSuperAdminRatingsSum += deptSuperAdminRatingSum;
+        deptSuperAdminRatingsCount += deptSuperAdminRatedTasks.length;
 
         deptObj.totalTasksGiven += userObj.tasksGiven;
         deptObj.totalTasksPending += userObj.tasksPending;
@@ -1098,8 +1130,8 @@ export const getNaacReport = async (req: Request, res: Response) => {
         deptObj.totalTasksCompleted += userObj.tasksCompleted;
       });
 
-      deptObj.totalRatings = deptRatingsCount;
-      deptObj.averageRating = deptRatingsCount > 0 ? Number((deptRatingsSum / deptRatingsCount).toFixed(1)) : 0;
+      deptObj.totalRatings = deptSuperAdminRatingsCount;
+      deptObj.averageRating = deptSuperAdminRatingsCount > 0 ? Number((deptSuperAdminRatingsSum / deptSuperAdminRatingsCount).toFixed(1)) : 0;
 
       // Sort users inside dept: Department Admin first, then Staff sorted by averageRating (desc), totalRatings (desc), totalCompleted (desc), name
       deptObj.users.sort((a: any, b: any) => {
@@ -1140,11 +1172,12 @@ export const getNaacReport = async (req: Request, res: Response) => {
 };
 
 // POST /api/tasks/:id/comments
+// POST /api/tasks/:id/comments
 // Add a comment/chat message to a task
 export const addTaskComment = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { message } = req.body;
+    const { message, channel } = req.body;
     const user = req.user;
 
     if (!message || !message.trim()) {
@@ -1182,9 +1215,30 @@ export const addTaskComment = async (req: Request, res: Response) => {
       task.comments = [];
     }
 
+    // Determine chat channel for 3-tier hierarchy:
+    // A 3-tier task has a distinct assignedTo (Dept Admin) and delegatedTo (Staff)
+    const isThreeTier = Boolean(
+      task.delegatedTo && 
+      task.assignedTo && 
+      task.delegatedTo.toString() !== task.assignedTo.toString()
+    );
+
+    let commentChannel: 'super_admin' | 'staff' | 'general' = 'general';
+    if (isThreeTier) {
+      if (user.role === 'super_admin') {
+        commentChannel = 'super_admin';
+      } else if (user.role === 'staff') {
+        commentChannel = 'staff';
+      } else if (user.role === 'department_admin') {
+        // Dept Admin chooses which tab/recipient they are messaging
+        commentChannel = channel === 'super_admin' ? 'super_admin' : 'staff';
+      }
+    }
+
     const newComment = {
       sender: user._id,
       message: message.trim(),
+      channel: commentChannel,
       readBy: [user._id],
       createdAt: new Date()
     };
@@ -1196,9 +1250,18 @@ export const addTaskComment = async (req: Request, res: Response) => {
     const updatedTask = await Task.findById(id)
       .populate('comments.sender', 'name role department universityId employeeId email');
 
+    let returnComments = updatedTask?.comments || [];
+    if (isThreeTier) {
+      if (user.role === 'super_admin') {
+        returnComments = returnComments.filter((c: any) => c.channel !== 'staff');
+      } else if (user.role === 'staff') {
+        returnComments = returnComments.filter((c: any) => c.channel !== 'super_admin');
+      }
+    }
+
     return res.status(201).json({
       success: true,
-      data: updatedTask?.comments || [],
+      data: returnComments,
       message: 'Comment posted successfully.'
     });
   } catch (error: any) {
@@ -1221,11 +1284,27 @@ export const getTaskComments = async (req: Request, res: Response) => {
       return res.status(404).json({ success: false, message: 'Task not found.' });
     }
 
-    // Mark unread comments as read for current user
+    const isThreeTier = Boolean(
+      task.delegatedTo && 
+      task.assignedTo && 
+      task.delegatedTo.toString() !== task.assignedTo.toString()
+    );
+
+    // Filter comments visible to this user
+    let visibleComments = task.comments || [];
+    if (isThreeTier) {
+      if (user.role === 'super_admin') {
+        visibleComments = visibleComments.filter((c: any) => c.channel !== 'staff');
+      } else if (user.role === 'staff') {
+        visibleComments = visibleComments.filter((c: any) => c.channel !== 'super_admin');
+      }
+    }
+
+    // Mark visible unread comments as read for current user
     let hasUnread = false;
     const now = new Date();
-    if (task.comments && task.comments.length > 0) {
-      task.comments.forEach((c: any) => {
+    if (visibleComments.length > 0) {
+      visibleComments.forEach((c: any) => {
         const isNotSender = c.sender ? (c.sender._id || c.sender).toString() !== user._id.toString() : true;
         if (isNotSender) {
           if (!c.readBy || !c.readBy.some((uid: any) => (uid?._id || uid).toString() === user._id.toString())) {
@@ -1243,7 +1322,7 @@ export const getTaskComments = async (req: Request, res: Response) => {
 
     return res.status(200).json({
       success: true,
-      data: task.comments || []
+      data: visibleComments
     });
   } catch (error: any) {
     console.error('Error fetching task comments:', error);
@@ -1252,10 +1331,11 @@ export const getTaskComments = async (req: Request, res: Response) => {
 };
 
 // PATCH /api/tasks/:id/comments/read
-// Mark all comments as read
+// Mark comments as read (optionally for a specific channel)
 export const markCommentsAsRead = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
+    const channel = req.body.channel || req.query.channel;
     const user = req.user;
     const now = new Date();
 
@@ -1266,6 +1346,11 @@ export const markCommentsAsRead = async (req: Request, res: Response) => {
 
     if (task.comments && task.comments.length > 0) {
       task.comments.forEach((c: any) => {
+        // If channel specified, only mark that channel
+        if (channel && c.channel && c.channel !== channel) return;
+        if (user.role === 'super_admin' && c.channel === 'staff') return;
+        if (user.role === 'staff' && c.channel === 'super_admin') return;
+
         const isNotSender = c.sender ? (c.sender._id || c.sender).toString() !== user._id.toString() : true;
         if (isNotSender) {
           if (!c.readBy) c.readBy = [];
