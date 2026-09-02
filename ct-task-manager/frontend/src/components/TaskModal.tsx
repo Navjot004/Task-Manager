@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, ChevronDown, Paperclip, FileText, Star } from 'lucide-react';
+import { Search, ChevronDown, Paperclip, FileText, Star, Building2, MessageSquare } from 'lucide-react';
 import { api } from '../services/api';
 import { calculateUrgency, getUrgencyColor, getUrgencyLabel } from '../utils/taskUrgency';
 import './TaskModal.css';
@@ -67,10 +67,12 @@ interface TaskModalProps {
   onRefresh: () => void;
   currentUser: any;
   availableAssignees: any[];
+  departments?: any[];
   onCreateSubtask?: () => void;
+  onOpenChat?: (task: any) => void;
 }
 
-const TaskModal: React.FC<TaskModalProps> = ({ task: initialTask, onClose, onRefresh, currentUser, availableAssignees = [], onCreateSubtask }) => {
+const TaskModal: React.FC<TaskModalProps> = ({ task: initialTask, onClose, onRefresh, currentUser, availableAssignees = [], departments = [], onCreateSubtask, onOpenChat }) => {
   const [task, setTask] = useState<any>(initialTask);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -86,14 +88,39 @@ const TaskModal: React.FC<TaskModalProps> = ({ task: initialTask, onClose, onRef
 
   // Assign mode
   const [isAssigning, setIsAssigning] = useState(false);
-  const [assignTarget, setAssignTarget] = useState(task.delegatedTo ? task.delegatedTo._id : (task.assignedTo ? task.assignedTo._id : ''));
+  const [assignTarget, setAssignTarget] = useState(task.delegatedTo ? (task.delegatedTo._id || task.delegatedTo.id) : (task.assignedTo ? (task.assignedTo._id || task.assignedTo.id) : ''));
   
   // Custom Assign Dropdown State (Main Task)
   const [isAssignDropdownOpen, setIsAssignDropdownOpen] = useState(false);
   const [assignSearchQuery, setAssignSearchQuery] = useState('');
   const [assignRoleFilter, setAssignRoleFilter] = useState<'all' | 'staff' | 'department_admin'>('all');
+  const [assignDeptFilter, setAssignDeptFilter] = useState<string>('all');
+  const [departmentList, setDepartmentList] = useState<string[]>([]);
   const assignDropdownRef = useRef<HTMLDivElement>(null);
 
+  // Load / build department list for filtering
+  useEffect(() => {
+    const updateDeptList = async () => {
+      let depts: string[] = [];
+      if (departments && departments.length > 0) {
+        depts = departments.map(d => typeof d === 'string' ? d : d.name).filter(Boolean);
+      } else if (currentUser?.role === 'super_admin') {
+        try {
+          const res = await api.getDepartments();
+          if (res.success && res.data?.departments) {
+            depts = res.data.departments.map((d: any) => d.name).filter(Boolean);
+          }
+        } catch (err) {
+          console.error('Failed to load departments', err);
+        }
+      }
+      const assigneeDepts = availableAssignees.map(a => a.department).filter(Boolean);
+      const unique = Array.from(new Set([...depts, ...assigneeDepts])).sort((a, b) => a.localeCompare(b));
+      setDepartmentList(unique);
+    };
+
+    updateDeptList();
+  }, [departments, availableAssignees, currentUser]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -105,12 +132,27 @@ const TaskModal: React.FC<TaskModalProps> = ({ task: initialTask, onClose, onRef
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const getFilteredAssignees = (query: string, role: string) => {
+  const getFilteredAssignees = (query: string, role: string, dept: string = 'all') => {
     return availableAssignees.filter(a => {
-      if (role !== 'all' && a.role !== role) return false;
+      // Role filter
+      if (role === 'department_admin' && !a.role?.includes('admin')) return false;
+      if (role === 'staff' && a.role !== 'staff') return false;
+      if (role !== 'all' && role !== 'department_admin' && role !== 'staff' && a.role !== role) return false;
+
+      // Department filter
+      if (currentUser?.role === 'super_admin' && dept !== 'all') {
+        if (!a.department || a.department.trim().toLowerCase() !== dept.trim().toLowerCase()) {
+          return false;
+        }
+      }
+
+      // Search query filter
       if (query) {
         const q = query.toLowerCase();
-        return a.name.toLowerCase().includes(q) || a.role.toLowerCase().includes(q);
+        return (a.name && a.name.toLowerCase().includes(q)) || 
+               (a.role && a.role.toLowerCase().includes(q)) || 
+               (a.department && a.department.toLowerCase().includes(q)) ||
+               (a.universityId && a.universityId.toLowerCase().includes(q));
       }
       return true;
     });
@@ -125,15 +167,17 @@ const TaskModal: React.FC<TaskModalProps> = ({ task: initialTask, onClose, onRef
     const isMe = userObj._id === currentUser.id || userObj.id === currentUser.id;
     const name = isMe ? 'me' : userObj.name;
     const staffId = userObj.universityId || 'N/A';
-    return <>{name} <span style={{ color: '#64748b', fontSize: '0.85rem' }}>(ID: {staffId})</span></>;
+    const dept = userObj.department ? ` • ${userObj.department}` : '';
+    return <>{name} <span style={{ color: '#64748b', fontSize: '0.85rem' }}>(ID: {staffId}{dept})</span></>;
   };
 
   const formatNameString = (userObj: any) => {
     if (!userObj) return 'Unassigned';
     const isMe = userObj._id === currentUser.id || userObj.id === currentUser.id;
     const name = isMe ? 'me' : userObj.name;
-    const staffId = userObj.universityId || 'N/A';
-    return `${name} (ID: ${staffId})`;
+    const staffId = userObj.universityId ? ` (ID: ${userObj.universityId})` : '';
+    const dept = userObj.department ? ` • ${userObj.department}` : '';
+    return `${name}${staffId}${dept}`;
   };
 
   // Submit Review mode
@@ -449,7 +493,36 @@ const TaskModal: React.FC<TaskModalProps> = ({ task: initialTask, onClose, onRef
                 </span>
                 {task.isSubtask && <span style={{ fontSize: '0.7rem', backgroundColor: '#e2e8f0', color: '#475569', padding: '0.2rem 0.6rem', borderRadius: '4px', verticalAlign: 'middle' }}>SUBTASK</span>}
               </h2>
-              <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+              <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+                {onOpenChat && (
+                  <button
+                    type="button"
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.4rem',
+                      backgroundColor: '#021c3b',
+                      color: '#ffffff',
+                      border: 'none',
+                      padding: '0.45rem 0.85rem',
+                      borderRadius: '8px',
+                      fontSize: '0.82rem',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      boxShadow: '0 2px 4px rgba(2, 28, 59, 0.2)'
+                    }}
+                    onClick={() => onOpenChat(task)}
+                    title="Open Task Discussion Thread"
+                  >
+                    <MessageSquare size={14} />
+                    <span>Chat / Discussion</span>
+                    {task.comments && task.comments.length > 0 && (
+                      <span style={{ backgroundColor: '#0284c7', padding: '0.05rem 0.4rem', borderRadius: '10px', fontSize: '0.7rem' }}>
+                        {task.comments.length}
+                      </span>
+                    )}
+                  </button>
+                )}
               </div>
             </div>
 
@@ -734,7 +807,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ task: initialTask, onClose, onRef
                           onClick={() => setIsAssignDropdownOpen(!isAssignDropdownOpen)}
                         >
                           {assignTarget ? (
-                            <span>{formatNameString(availableAssignees.find(a => a.id === assignTarget))}</span>
+                            <span>{formatNameString(availableAssignees.find(a => a.id === assignTarget || a._id === assignTarget))}</span>
                           ) : (
                             <span style={{ color: '#94a3b8' }}>-- Unassigned --</span>
                           )}
@@ -756,19 +829,47 @@ const TaskModal: React.FC<TaskModalProps> = ({ task: initialTask, onClose, onRef
                                 />
                               </div>
                               {currentUser.role === 'super_admin' && (
-                                <div className="tm-role-filters">
-                                  <button 
-                                    className={`tm-role-filter-btn ${assignRoleFilter === 'all' ? 'active' : ''}`}
-                                    onClick={(e) => { e.stopPropagation(); setAssignRoleFilter('all'); }}
-                                  >All</button>
-                                  <button 
-                                    className={`tm-role-filter-btn ${assignRoleFilter === 'department_admin' ? 'active' : ''}`}
-                                    onClick={(e) => { e.stopPropagation(); setAssignRoleFilter('department_admin'); }}
-                                  >Admins</button>
-                                  <button 
-                                    className={`tm-role-filter-btn ${assignRoleFilter === 'staff' ? 'active' : ''}`}
-                                    onClick={(e) => { e.stopPropagation(); setAssignRoleFilter('staff'); }}
-                                  >Staff</button>
+                                <div className="tm-dropdown-filter-controls">
+                                  <div className="tm-dept-filter-wrapper">
+                                    <Building2 size={13} className="tm-dept-filter-icon" />
+                                    <select 
+                                      className="tm-dept-filter-select"
+                                      value={assignDeptFilter}
+                                      onChange={(e) => {
+                                        e.stopPropagation();
+                                        setAssignDeptFilter(e.target.value);
+                                      }}
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      <option value="all">All Departments ({availableAssignees.length})</option>
+                                      {departmentList.map(dept => {
+                                        const count = availableAssignees.filter(a => a.department && a.department.toLowerCase() === dept.toLowerCase()).length;
+                                        return (
+                                          <option key={dept} value={dept}>
+                                            {dept} {count > 0 ? `(${count})` : ''}
+                                          </option>
+                                        );
+                                      })}
+                                    </select>
+                                  </div>
+
+                                  <div className="tm-role-filters">
+                                    <button 
+                                      type="button"
+                                      className={`tm-role-filter-btn ${assignRoleFilter === 'all' ? 'active' : ''}`}
+                                      onClick={(e) => { e.stopPropagation(); setAssignRoleFilter('all'); }}
+                                    >All</button>
+                                    <button 
+                                      type="button"
+                                      className={`tm-role-filter-btn ${assignRoleFilter === 'department_admin' ? 'active' : ''}`}
+                                      onClick={(e) => { e.stopPropagation(); setAssignRoleFilter('department_admin'); }}
+                                    >Admins</button>
+                                    <button 
+                                      type="button"
+                                      className={`tm-role-filter-btn ${assignRoleFilter === 'staff' ? 'active' : ''}`}
+                                      onClick={(e) => { e.stopPropagation(); setAssignRoleFilter('staff'); }}
+                                    >Staff</button>
+                                  </div>
                                 </div>
                               )}
                             </div>
@@ -781,25 +882,38 @@ const TaskModal: React.FC<TaskModalProps> = ({ task: initialTask, onClose, onRef
                                   setIsAssignDropdownOpen(false);
                                 }}
                               >
-                                <span>-- Unassigned --</span>
+                                <span style={{ color: '#94a3b8' }}>-- Unassigned --</span>
                               </li>
-                              {getFilteredAssignees(assignSearchQuery, assignRoleFilter).length === 0 && (
+                              {getFilteredAssignees(assignSearchQuery, assignRoleFilter, assignDeptFilter).length === 0 && (
                                 <li className="tm-dropdown-item empty">No users found</li>
                               )}
-                              {getFilteredAssignees(assignSearchQuery, assignRoleFilter).map(a => (
-                                <li 
-                                  key={a.id}
-                                  className={`tm-dropdown-item ${assignTarget === a.id ? 'selected' : ''}`}
-                                  onClick={() => {
-                                    setAssignTarget(a.id);
-                                    setIsAssignDropdownOpen(false);
-                                    setAssignSearchQuery('');
-                                  }}
-                                >
-                                  <span>{a.id === currentUser.id ? 'me' : a.name}</span>
-                                  <span className="tm-assignee-role">(ID: {a.universityId || 'N/A'})</span>
-                                </li>
-                              ))}
+                              {getFilteredAssignees(assignSearchQuery, assignRoleFilter, assignDeptFilter).map(a => {
+                                const userId = a.id || a._id;
+                                const isSelected = assignTarget === userId;
+                                return (
+                                  <li 
+                                    key={userId}
+                                    className={`tm-dropdown-item ${isSelected ? 'selected' : ''}`}
+                                    onClick={() => {
+                                      setAssignTarget(userId);
+                                      setIsAssignDropdownOpen(false);
+                                      setAssignSearchQuery('');
+                                    }}
+                                  >
+                                    <div className="tm-assignee-info">
+                                      <div className="tm-assignee-primary">
+                                        <span className="tm-assignee-name">{userId === currentUser.id || userId === currentUser._id ? 'me' : a.name}</span>
+                                        {a.role?.includes('admin') && <span className="tm-role-tag admin">Admin</span>}
+                                        {a.role === 'staff' && <span className="tm-role-tag staff">Staff</span>}
+                                      </div>
+                                      {a.department && (
+                                        <span className="tm-assignee-dept">{a.department}</span>
+                                      )}
+                                    </div>
+                                    <span className="tm-assignee-role">ID: {a.universityId || 'N/A'}</span>
+                                  </li>
+                                );
+                              })}
                             </ul>
                           </div>
                         )}

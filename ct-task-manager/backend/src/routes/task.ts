@@ -11,7 +11,10 @@ import {
   createSubtask,
   getSubtasks,
   getTaskProgress,
-  getNaacReport
+  getNaacReport,
+  addTaskComment,
+  getTaskComments,
+  markCommentsAsRead
 } from '../controllers/taskController';
 import { authenticate, authorizeRoles } from '../middleware/auth';
 import { uploadAny } from '../middleware/upload';
@@ -79,5 +82,20 @@ router.get('/:id/subtasks', getSubtasks);
 // @desc    Get progress of a parent task
 // @access  All roles
 router.get('/:id/progress', getTaskProgress);
+
+// @route   POST /api/tasks/:id/comments
+// @desc    Post a comment/message to a task
+// @access  Task participants & admins
+router.post('/:id/comments', addTaskComment);
+
+// @route   GET /api/tasks/:id/comments
+// @desc    Get all comments for a task
+// @access  Task participants & admins
+router.get('/:id/comments', getTaskComments);
+
+// @route   PATCH /api/tasks/:id/comments/read
+// @desc    Mark comments as read for a task
+// @access  All authenticated users
+router.patch('/:id/comments/read', markCommentsAsRead);
 
 export default router;

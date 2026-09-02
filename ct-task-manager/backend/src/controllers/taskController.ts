@@ -1138,3 +1138,150 @@ export const getNaacReport = async (req: Request, res: Response) => {
     return res.status(500).json({ success: false, message: 'Server Error' });
   }
 };
+
+// POST /api/tasks/:id/comments
+// Add a comment/chat message to a task
+export const addTaskComment = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { message } = req.body;
+    const user = req.user;
+
+    if (!message || !message.trim()) {
+      return res.status(400).json({ success: false, message: 'Message cannot be empty.' });
+    }
+
+    const task = await Task.findById(id);
+    if (!task) {
+      return res.status(404).json({ success: false, message: 'Task not found.' });
+    }
+
+    // Permission check: Super Admin, Creator, Assignee, Delegated, or Department Admin
+    let hasAccess = false;
+    if (user.role === 'super_admin') {
+      hasAccess = true;
+    } else if (task.createdBy.toString() === user._id.toString()) {
+      hasAccess = true;
+    } else if (task.assignedTo && task.assignedTo.toString() === user._id.toString()) {
+      hasAccess = true;
+    } else if (task.delegatedTo && task.delegatedTo.toString() === user._id.toString()) {
+      hasAccess = true;
+    } else if (user.role === 'department_admin') {
+      // Check if task is within admin's department
+      const assignedUser = await User.findById(task.assignedTo || task.delegatedTo);
+      if (assignedUser && assignedUser.department === user.department) {
+        hasAccess = true;
+      }
+    }
+
+    if (!hasAccess) {
+      return res.status(403).json({ success: false, message: 'Forbidden. You do not have permission to comment on this task.' });
+    }
+
+    if (!task.comments) {
+      task.comments = [];
+    }
+
+    const newComment = {
+      sender: user._id,
+      message: message.trim(),
+      readBy: [user._id],
+      createdAt: new Date()
+    };
+
+    task.comments.push(newComment as any);
+    await task.save();
+
+    // Populate the task comments with sender info
+    const updatedTask = await Task.findById(id)
+      .populate('comments.sender', 'name role department universityId employeeId email');
+
+    return res.status(201).json({
+      success: true,
+      data: updatedTask?.comments || [],
+      message: 'Comment posted successfully.'
+    });
+  } catch (error: any) {
+    console.error('Error adding task comment:', error);
+    return res.status(500).json({ success: false, message: error.message || 'Server error.' });
+  }
+};
+
+// GET /api/tasks/:id/comments
+// Fetch all comments for a task
+export const getTaskComments = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const user = req.user;
+
+    const task = await Task.findById(id)
+      .populate('comments.sender', 'name role department universityId employeeId email');
+
+    if (!task) {
+      return res.status(404).json({ success: false, message: 'Task not found.' });
+    }
+
+    // Mark unread comments as read for current user
+    let hasUnread = false;
+    const now = new Date();
+    if (task.comments && task.comments.length > 0) {
+      task.comments.forEach((c: any) => {
+        const isNotSender = c.sender ? (c.sender._id || c.sender).toString() !== user._id.toString() : true;
+        if (isNotSender) {
+          if (!c.readBy || !c.readBy.some((uid: any) => (uid?._id || uid).toString() === user._id.toString())) {
+            if (!c.readBy) c.readBy = [];
+            c.readBy.push(user._id);
+            c.readAt = now;
+            hasUnread = true;
+          }
+        }
+      });
+      if (hasUnread) {
+        await task.save();
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: task.comments || []
+    });
+  } catch (error: any) {
+    console.error('Error fetching task comments:', error);
+    return res.status(500).json({ success: false, message: error.message || 'Server error.' });
+  }
+};
+
+// PATCH /api/tasks/:id/comments/read
+// Mark all comments as read
+export const markCommentsAsRead = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const user = req.user;
+    const now = new Date();
+
+    const task = await Task.findById(id);
+    if (!task) {
+      return res.status(404).json({ success: false, message: 'Task not found.' });
+    }
+
+    if (task.comments && task.comments.length > 0) {
+      task.comments.forEach((c: any) => {
+        const isNotSender = c.sender ? (c.sender._id || c.sender).toString() !== user._id.toString() : true;
+        if (isNotSender) {
+          if (!c.readBy) c.readBy = [];
+          if (!c.readBy.some((uid: any) => (uid?._id || uid).toString() === user._id.toString())) {
+            c.readBy.push(user._id);
+            c.readAt = now;
+          }
+        }
+      });
+      await task.save();
+    }
+
+    return res.status(200).json({ success: true, message: 'Comments marked as read.' });
+  } catch (error: any) {
+    console.error('Error marking comments as read:', error);
+    return res.status(500).json({ success: false, message: error.message || 'Server error.' });
+  }
+};
+

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, CheckCircle2, CornerDownRight } from 'lucide-react';
+import { Calendar, CheckCircle2, CornerDownRight, MessageSquare } from 'lucide-react';
 import { api } from '../services/api';
 import { calculateUrgency, getUrgencyCardStyle, getUrgencyLabel, getUrgencyColor } from '../utils/taskUrgency';
 import './TaskCard.css';
@@ -9,9 +9,10 @@ interface TaskCardProps {
   currentUser: any;
   onClick: (task: any) => void;
   onCreateSubtask?: () => void;
+  onOpenChat?: (task: any) => void;
 }
 
-const TaskCard: React.FC<TaskCardProps> = ({ task, currentUser, onClick, onCreateSubtask }) => {
+const TaskCard: React.FC<TaskCardProps> = ({ task, currentUser, onClick, onCreateSubtask, onOpenChat }) => {
   const [progress, setProgress] = useState<any>(null);
 
   useEffect(() => {
@@ -100,6 +101,17 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, currentUser, onClick, onCreat
     }
   };
 
+  const commentCount = task.comments?.length || 0;
+  const currentUserId = currentUser?._id || currentUser?.id;
+  const hasUnread = Boolean(
+    task.comments &&
+    task.comments.length > 0 &&
+    task.comments.some((c: any) => {
+      if (!c.readBy || !Array.isArray(c.readBy)) return true;
+      return !c.readBy.some((uid: any) => (uid?._id || uid)?.toString() === currentUserId?.toString());
+    })
+  );
+
   return (
     <div className="tc-card" style={cardStyle} onClick={() => onClick(task)}>
       <div className="tc-header">
@@ -137,9 +149,25 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, currentUser, onClick, onCreat
         {task.description}
       </div>
 
-      {/* Status Pill */}
-      <div style={{ marginBottom: '1rem' }}>
+      {/* Status Pill & Chat Button */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
         <div className={`tc-status-pill ${pillClass}`} style={{ display: 'inline-block' }}>{statusText}</div>
+        
+        {onOpenChat && (
+          <button 
+            className={`tc-chat-btn ${hasUnread ? 'has-unread' : ''}`}
+            title="Open Task Discussion / Chat"
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpenChat(task);
+            }}
+          >
+            <MessageSquare size={13} />
+            <span>Chat</span>
+            {commentCount > 0 && <span className="tc-chat-count">{commentCount}</span>}
+            {hasUnread && <span className="tc-unread-dot" />}
+          </button>
+        )}
       </div>
       
       {/* Optional Progress Bar for main tasks */}

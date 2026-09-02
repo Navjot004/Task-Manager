@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import TaskCard from '../components/TaskCard';
 import TaskModal from '../components/TaskModal';
 import CreateTaskView from '../components/CreateTaskView';
+import TaskChatDrawer from '../components/TaskChatDrawer';
 import { Search, Plus } from 'lucide-react';
 import { calculateUrgency } from '../utils/taskUrgency';
 import './TasksPage.css';
@@ -34,6 +35,7 @@ const TasksPage: React.FC = () => {
 
   // Modals & Views
   const [selectedTask, setSelectedTask] = useState<any | null>(null);
+  const [chatTask, setChatTask] = useState<any | null>(null);
   const [isCreatingTask, setIsCreatingTask] = useState(false);
   const [creatingSubtaskFor, setCreatingSubtaskFor] = useState<string | null>(null);
   
@@ -197,6 +199,7 @@ const TasksPage: React.FC = () => {
           setCreatingSubtaskFor(null);
         }}
         availableAssignees={availableAssignees}
+        departments={departments}
         preselectedParentTask={creatingSubtaskFor}
         currentUser={user}
       />
@@ -325,6 +328,7 @@ const TasksPage: React.FC = () => {
                   currentUser={user}
                   onClick={() => setSelectedTask(task)} 
                   onCreateSubtask={() => handleCreateSubtaskForTask(task._id)}
+                  onOpenChat={(t) => setChatTask(t)}
                 />
               ))}
             </div>
@@ -359,6 +363,7 @@ const TasksPage: React.FC = () => {
           task={selectedTask} 
           currentUser={user}
           availableAssignees={availableAssignees}
+          departments={departments}
           onClose={() => setSelectedTask(null)}
           onRefresh={() => {
             loadTasks();
@@ -366,8 +371,20 @@ const TasksPage: React.FC = () => {
             api.getTaskById(selectedTask._id).then(res => setSelectedTask(res.data.task)).catch(() => setSelectedTask(null));
           }}
           onCreateSubtask={() => handleCreateSubtaskForTask(selectedTask._id)}
+          onOpenChat={(t) => setChatTask(t)}
         />
       )}
+
+      {/* Task-Specific Chat Drawer */}
+      <TaskChatDrawer
+        task={chatTask}
+        currentUser={user}
+        isOpen={!!chatTask}
+        onClose={() => setChatTask(null)}
+        onMessageSent={() => {
+          loadTasks();
+        }}
+      />
     </>
   );
 };

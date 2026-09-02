@@ -1,12 +1,16 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { api } from '../services/api';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
 } from 'recharts';
 import { 
   CheckCircle, ClipboardList, Building2, BarChart3, ChevronRight, 
-  Trophy, Star, Crown, X, Shield
+  Trophy, Star, Crown, X, Shield, FileSpreadsheet, FileText, Download, ChevronDown
 } from 'lucide-react';
+import { 
+  exportNaacToExcel, exportNaacToPdf, 
+  exportDepartmentToExcel, exportDepartmentToPdf 
+} from '../utils/naacExport';
 import './NaacDashboardPage.css';
 
 interface UserReport {
@@ -47,6 +51,26 @@ const NaacDashboardPage: React.FC = () => {
   const [error, setError] = useState('');
   const [expandedDept, setExpandedDept] = useState<string | null>(null);
   const [selectedDeptModal, setSelectedDeptModal] = useState<DepartmentReport | null>(null);
+
+  // Unified Export Dropdown States
+  const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
+  const [isDeptExportMenuOpen, setIsDeptExportMenuOpen] = useState(false);
+  const exportMenuRef = useRef<HTMLDivElement>(null);
+  const deptExportMenuRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdowns on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
+        setIsExportMenuOpen(false);
+      }
+      if (deptExportMenuRef.current && !deptExportMenuRef.current.contains(e.target as Node)) {
+        setIsDeptExportMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const toggleExpand = (dept: string) => {
     setExpandedDept(expandedDept === dept ? null : dept);
@@ -96,9 +120,78 @@ const NaacDashboardPage: React.FC = () => {
         
         {/* Header Section */}
         <div className="naac-header">
-          <div>
+          <div className="naac-header-text">
             <h1>NAAC Reports & Ratings Dashboard</h1>
             <p>Comprehensive university-wide performance, department rankings & ratings.</p>
+          </div>
+          <div className="naac-header-actions">
+            <div className="naac-export-dropdown-wrapper" ref={exportMenuRef}>
+              <button 
+                className="naac-unified-export-btn"
+                onClick={() => setIsExportMenuOpen(!isExportMenuOpen)}
+                aria-expanded={isExportMenuOpen}
+              >
+                <Download size={16} />
+                <span>Export Report</span>
+                <ChevronDown size={14} className={`export-chevron ${isExportMenuOpen ? 'open' : ''}`} />
+              </button>
+
+              {isExportMenuOpen && (
+                <div className="naac-export-dropdown-menu">
+                  <div className="naac-export-menu-header">Download University Report</div>
+                  
+                  <button 
+                    className="naac-export-menu-item"
+                    onClick={() => {
+                      exportNaacToExcel(data, {
+                        totalDepts,
+                        activeDeptsCount,
+                        totalGiven,
+                        totalCompleted,
+                        totalPending,
+                        totalReview,
+                        overallRate,
+                        resourceUtilization
+                      });
+                      setIsExportMenuOpen(false);
+                    }}
+                  >
+                    <div className="export-menu-icon excel">
+                      <FileSpreadsheet size={18} />
+                    </div>
+                    <div className="export-menu-text">
+                      <div className="export-menu-title">Excel Spreadsheet (.xlsx)</div>
+                      <div className="export-menu-desc">Executive summary, department rankings & staff roster</div>
+                    </div>
+                  </button>
+
+                  <button 
+                    className="naac-export-menu-item"
+                    onClick={() => {
+                      exportNaacToPdf(data, {
+                        totalDepts,
+                        activeDeptsCount,
+                        totalGiven,
+                        totalCompleted,
+                        totalPending,
+                        totalReview,
+                        overallRate,
+                        resourceUtilization
+                      });
+                      setIsExportMenuOpen(false);
+                    }}
+                  >
+                    <div className="export-menu-icon pdf">
+                      <FileText size={18} />
+                    </div>
+                    <div className="export-menu-text">
+                      <div className="export-menu-title">PDF Document (.pdf)</div>
+                      <div className="export-menu-desc">Audit-ready institutional evaluation report</div>
+                    </div>
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -486,6 +579,61 @@ const NaacDashboardPage: React.FC = () => {
                 <span className="dept-stat-lbl">Tasks Completed</span>
                 <span className="dept-stat-big-num">{selectedDeptModal.totalTasksCompleted}</span>
                 <span className="dept-stat-sub">{selectedDeptModal.completionRate}% Completion Rate</span>
+              </div>
+            </div>
+
+            {/* Department-specific Export Actions Bar */}
+            <div className="naac-modal-export-bar">
+              <div className="naac-modal-export-info">
+                <Shield size={15} color="#475569" />
+                <span>Department NAAC Audit:</span>
+              </div>
+              <div className="naac-modal-export-wrapper" ref={deptExportMenuRef}>
+                <button 
+                  className="naac-modal-unified-btn"
+                  onClick={() => setIsDeptExportMenuOpen(!isDeptExportMenuOpen)}
+                  aria-expanded={isDeptExportMenuOpen}
+                >
+                  <Download size={14} />
+                  <span>Export Department Data</span>
+                  <ChevronDown size={13} className={`export-chevron ${isDeptExportMenuOpen ? 'open' : ''}`} />
+                </button>
+
+                {isDeptExportMenuOpen && (
+                  <div className="naac-export-dropdown-menu dept-modal-menu">
+                    <button 
+                      className="naac-export-menu-item"
+                      onClick={() => {
+                        exportDepartmentToExcel(selectedDeptModal);
+                        setIsDeptExportMenuOpen(false);
+                      }}
+                    >
+                      <div className="export-menu-icon excel">
+                        <FileSpreadsheet size={16} />
+                      </div>
+                      <div className="export-menu-text">
+                        <div className="export-menu-title">Excel (.xlsx)</div>
+                        <div className="export-menu-desc">Staff roster & rating scores</div>
+                      </div>
+                    </button>
+
+                    <button 
+                      className="naac-export-menu-item"
+                      onClick={() => {
+                        exportDepartmentToPdf(selectedDeptModal);
+                        setIsDeptExportMenuOpen(false);
+                      }}
+                    >
+                      <div className="export-menu-icon pdf">
+                        <FileText size={16} />
+                      </div>
+                      <div className="export-menu-text">
+                        <div className="export-menu-title">PDF Report (.pdf)</div>
+                        <div className="export-menu-desc">Department audit document</div>
+                      </div>
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
 

@@ -20,6 +20,7 @@ import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { calculateUrgency, getUrgencyCardStyle, getUrgencyColor } from '../utils/taskUrgency';
 import TaskModal from '../components/TaskModal';
+import TaskChatDrawer from '../components/TaskChatDrawer';
 import './SuperAdminDashboard.css';
 
 const SuperAdminPage = () => {
@@ -28,6 +29,7 @@ const SuperAdminPage = () => {
 
   const [selectedTask, setSelectedTask] = useState<any | null>(null);
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
+  const [chatTask, setChatTask] = useState<any | null>(null);
 
   const [userStats, setUserStats] = useState({
     totalUsers: 0,
@@ -463,8 +465,18 @@ const SuperAdminPage = () => {
           }}
           currentUser={currentUser}
           availableAssignees={[]} // Assignees aren't edited directly from dashboard usually
+          departments={departments}
+          onOpenChat={(t) => setChatTask(t)}
         />
       )}
+
+      {/* Task-Specific Chat Drawer */}
+      <TaskChatDrawer
+        task={chatTask}
+        currentUser={currentUser}
+        isOpen={!!chatTask}
+        onClose={() => setChatTask(null)}
+      />
     </div>
   );
 };

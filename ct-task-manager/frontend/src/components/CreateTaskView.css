@@ -313,7 +313,7 @@
   border-radius: 8px;
   box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
   z-index: 50;
-  max-height: 300px;
+  max-height: 380px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -603,16 +603,63 @@
 
 /* Custom Dropdown Filters */
 .ct-dropdown-search-container {
-  padding: 0.5rem;
+  padding: 0.6rem;
   border-bottom: 1px solid #e2e8f0;
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+  background: #ffffff;
 }
 
 .ct-dropdown-search-container .ct-dropdown-search {
   padding: 0;
   border-bottom: none;
+}
+
+.ct-dropdown-filter-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.ct-dept-filter-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.ct-dept-filter-icon {
+  position: absolute;
+  left: 0.55rem;
+  color: #64748b;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.ct-dept-filter-select {
+  width: 100%;
+  padding: 0.35rem 0.5rem 0.35rem 1.7rem;
+  font-size: 0.78rem;
+  background-color: #f8fafc;
+  border: 1px solid #cbd5e1;
+  border-radius: 5px;
+  color: #1e293b;
+  outline: none;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.ct-dept-filter-select:hover {
+  background-color: #f1f5f9;
+  border-color: #94a3b8;
+}
+
+.ct-dept-filter-select:focus {
+  border-color: #3b82f6;
+  background-color: #ffffff;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
 }
 
 .ct-role-filters {
@@ -622,10 +669,11 @@
 
 .ct-role-filter-btn {
   flex: 1;
-  padding: 0.25rem;
+  padding: 0.3rem 0.25rem;
   font-size: 0.75rem;
+  font-weight: 500;
   background: #f1f5f9;
-  border: 1px solid transparent;
+  border: 1px solid #e2e8f0;
   border-radius: 4px;
   cursor: pointer;
   color: #475569;
@@ -634,21 +682,74 @@
 
 .ct-role-filter-btn:hover {
   background: #e2e8f0;
+  color: #0f172a;
 }
 
 .ct-role-filter-btn.active {
   background: #0f172a;
-  color: white;
+  color: #ffffff;
+  border-color: #0f172a;
 }
 
 .ct-assignee-item {
+  display: flex;
+  align-items: center;
   justify-content: space-between;
+  padding: 0.55rem 0.75rem;
+  gap: 0.5rem;
+}
+
+.ct-assignee-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.ct-assignee-primary {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.ct-assignee-name {
+  font-weight: 500;
+  color: #0f172a;
+  font-size: 0.85rem;
+}
+
+.ct-role-tag {
+  font-size: 0.65rem;
+  font-weight: 600;
+  padding: 0.05rem 0.35rem;
+  border-radius: 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.ct-role-tag.admin {
+  background-color: #dbeafe;
+  color: #1d4ed8;
+}
+
+.ct-role-tag.staff {
+  background-color: #f1f5f9;
+  color: #475569;
+}
+
+.ct-assignee-dept {
+  font-size: 0.72rem;
+  color: #64748b;
 }
 
 .ct-assignee-role {
   font-size: 0.7rem;
   color: #64748b;
-  background: #e2e8f0;
-  padding: 0.1rem 0.3rem;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  padding: 0.15rem 0.4rem;
   border-radius: 4px;
+  white-space: nowrap;
+  flex-shrink: 0;
 }

@@ -26,6 +26,15 @@ export interface ITask extends Document {
   ratedBy?: mongoose.Types.ObjectId | null;
   ratedAt?: Date | null;
   ratedUser?: mongoose.Types.ObjectId | null;
+  comments?: Array<{
+    _id?: mongoose.Types.ObjectId;
+    sender: mongoose.Types.ObjectId;
+    message: string;
+    attachments?: mongoose.Types.ObjectId[];
+    readBy?: mongoose.Types.ObjectId[];
+    readAt?: Date | null;
+    createdAt: Date;
+  }>;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -151,7 +160,39 @@ const taskSchema = new Schema<ITask>(
       ref: 'User',
       default: null,
       index: true
-    }
+    },
+    comments: [
+      {
+        sender: {
+          type: Schema.Types.ObjectId,
+          ref: 'User',
+          required: true
+        },
+        message: {
+          type: String,
+          required: true,
+          trim: true,
+          maxlength: 3000
+        },
+        attachments: [{
+          type: Schema.Types.ObjectId,
+          default: []
+        }],
+        readBy: [{
+          type: Schema.Types.ObjectId,
+          ref: 'User',
+          default: []
+        }],
+        readAt: {
+          type: Date,
+          default: null
+        },
+        createdAt: {
+          type: Date,
+          default: Date.now
+        }
+      }
+    ]
   },
   {
     timestamps: true,

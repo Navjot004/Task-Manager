@@ -61,6 +61,24 @@ export interface User {
   isActive?: boolean;
 }
 
+export interface TaskComment {
+  _id: string;
+  sender: {
+    _id: string;
+    name: string;
+    role: string;
+    department?: string;
+    universityId?: string;
+    employeeId?: string;
+    email?: string;
+  };
+  message: string;
+  attachments?: any[];
+  readBy?: string[];
+  readAt?: string | null;
+  createdAt: string;
+}
+
 export interface Task {
   _id: string;
   id?: string;
@@ -87,6 +105,7 @@ export interface Task {
   ratedBy?: any;
   ratedAt?: string | null;
   ratedUser?: any;
+  comments?: TaskComment[];
   createdAt: string;
   updatedAt: string;
 }
@@ -539,5 +558,23 @@ export const api = {
     const json = await response.json();
     if (!response.ok) throw new Error(json.message || 'Failed to fetch file metadata');
     return json;
+  },
+
+  getTaskComments: async (taskId: string): Promise<{ success: boolean; data: TaskComment[] }> => {
+    return fetchWithAuth(`/api/tasks/${taskId}/comments`);
+  },
+
+  addTaskComment: async (taskId: string, message: string): Promise<{ success: boolean; data: TaskComment[]; message: string }> => {
+    return fetchWithAuth(`/api/tasks/${taskId}/comments`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message }),
+    });
+  },
+
+  markTaskCommentsRead: async (taskId: string): Promise<{ success: boolean; message: string }> => {
+    return fetchWithAuth(`/api/tasks/${taskId}/comments/read`, {
+      method: 'PATCH',
+    });
   }
 };
