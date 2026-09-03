@@ -7,6 +7,7 @@ import staffAssignmentRoutes from './staffAssignment';
 import taskRoutes from './task';
 import departmentRoutes from './department';
 import fileRoutes from './file';
+import notificationRoutes from './notification';
 
 const router = Router();
 
@@ -19,5 +20,6 @@ router.use('/staff-assignments', staffAssignmentRoutes);
 router.use('/tasks', taskRoutes);
 router.use('/departments', departmentRoutes);
 router.use('/files', fileRoutes);
+router.use('/notifications', notificationRoutes);
 
 export default router;

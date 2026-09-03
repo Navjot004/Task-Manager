@@ -3,6 +3,7 @@ import Task from '../models/Task';
 import User from '../models/User';
 import StaffAssignment from '../models/StaffAssignment';
 import mongoose from 'mongoose';
+import { createNotification } from './notificationController';
 
 /** Helper to check if a Department Admin can assign/manage a specific staff member */
 const checkAdminStaffPermission = async (adminId: string, staffId: string) => {
@@ -137,6 +138,18 @@ export const createTask = async (req: Request, res: Response) => {
       .populate('createdBy', 'name role universityId')
       .populate('assignedTo', 'name role department universityId')
       .populate('parentTaskId', 'taskId title');
+
+    // Notify assignee about new task
+    if (finalAssignee && finalAssignee.toString() !== user._id.toString()) {
+      createNotification(
+        finalAssignee,
+        'task_assigned',
+        'New Task Assigned',
+        `Task #${populatedTask?.taskId || ''} "${title}" has been assigned to you.`,
+        task._id,
+        user._id
+      );
+    }
 
     return res.status(201).json({ success: true, data: { task: populatedTask } });
   } catch (error) {
@@ -511,6 +524,19 @@ export const assignTask = async (req: Request, res: Response) => {
       .populate('ratedUser', 'name role department universityId')
       .populate('parentTaskId', 'taskId title');
 
+    // Notify the assigned/delegated user
+    const notifyTarget = task.delegatedTo || assignedTo;
+    if (notifyTarget && notifyTarget.toString() !== user._id.toString()) {
+      createNotification(
+        notifyTarget,
+        task.delegatedTo ? 'task_delegated' : 'task_assigned',
+        task.delegatedTo ? 'Task Delegated to You' : 'Task Assigned to You',
+        `Task #${populatedTask?.taskId || ''} "${task.title}" has been ${task.delegatedTo ? 'delegated' : 'assigned'} to you.`,
+        task._id,
+        user._id
+      );
+    }
+
     return res.status(200).json({ success: true, data: { task: populatedTask } });
   } catch (error) {
     console.error('Error assigning task:', error);
@@ -570,6 +596,27 @@ export const updateTaskStatus = async (req: Request, res: Response) => {
       task.completedAt = new Date();
     }
     await task.save();
+
+    // Notify creator/admin about status change
+    if (status === 'in_progress' || status === 'completed') {
+      const notifyUsers: string[] = [];
+      if (task.createdBy && task.createdBy.toString() !== user._id.toString()) {
+        notifyUsers.push(task.createdBy.toString());
+      }
+      if (task.assignedTo && task.assignedTo.toString() !== user._id.toString() && !notifyUsers.includes(task.assignedTo.toString())) {
+        notifyUsers.push(task.assignedTo.toString());
+      }
+      for (const uid of notifyUsers) {
+        createNotification(
+          uid,
+          'task_status_changed',
+          status === 'in_progress' ? 'Task Started' : 'Task Completed',
+          `Task #${task.taskId || ''} "${task.title}" has been ${status === 'in_progress' ? 'started' : 'completed'} by ${user.name || 'a user'}.`,
+          task._id,
+          user._id
+        );
+      }
+    }
 
     return res.status(200).json({ success: true, data: { task } });
   } catch (error) {
@@ -674,6 +721,18 @@ export const submitReview = async (req: Request, res: Response) => {
     }
 
     await task.save();
+
+    // Notify reviewer about submission
+    if (task.currentReviewer && task.currentReviewer.toString() !== user._id.toString()) {
+      createNotification(
+        task.currentReviewer,
+        'task_submitted_for_review',
+        'Task Submitted for Review',
+        `Task #${task.taskId || ''} "${task.title}" has been submitted for your review.`,
+        task._id,
+        user._id
+      );
+    }
 
     return res.status(200).json({ success: true, data: { task } });
   } catch (error) {
@@ -799,6 +858,55 @@ export const reviewTask = async (req: Request, res: Response) => {
     }
 
     await task.save();
+
+    // Notify relevant users about review decision
+    const performer = task.delegatedTo || task.assignedTo;
+    if (decision === 'approved') {
+      // Notify performer
+      if (performer && performer.toString() !== user._id.toString()) {
+        createNotification(
+          performer,
+          'task_approved',
+          'Task Approved',
+          `Task #${task.taskId || ''} "${task.title}" has been approved${rating ? ` with a ${rating}-star rating` : ''}.`,
+          task._id,
+          user._id
+        );
+      }
+      // If forwarded to super admin, notify super admin
+      if (task.reviewStage === 'super_admin' && task.currentReviewer && task.currentReviewer.toString() !== user._id.toString()) {
+        createNotification(
+          task.currentReviewer,
+          'task_submitted_for_review',
+          'Task Forwarded for Final Review',
+          `Task #${task.taskId || ''} "${task.title}" has been forwarded to you for final approval.`,
+          task._id,
+          user._id
+        );
+      }
+      // Notify about rating if given
+      if (rating && task.ratedUser && task.ratedUser.toString() !== user._id.toString()) {
+        createNotification(
+          task.ratedUser,
+          'task_rated',
+          'Task Rated',
+          `You received a ${rating}-star rating on Task #${task.taskId || ''} "${task.title}".`,
+          task._id,
+          user._id
+        );
+      }
+    } else if (decision === 'rejected') {
+      if (performer && performer.toString() !== user._id.toString()) {
+        createNotification(
+          performer,
+          'task_rejected',
+          'Task Needs Revision',
+          `Task #${task.taskId || ''} "${task.title}" was returned for revision: ${reason || 'See task details'}.`,
+          task._id,
+          user._id
+        );
+      }
+    }
 
     return res.status(200).json({ success: true, data: { task } });
   } catch (error) {
@@ -1257,6 +1365,36 @@ export const addTaskComment = async (req: Request, res: Response) => {
       } else if (user.role === 'staff') {
         returnComments = returnComments.filter((c: any) => c.channel !== 'super_admin');
       }
+    }
+
+    // Notify other chat participants
+    const chatNotifyTargets = new Set<string>();
+    if (isThreeTier) {
+      if (commentChannel === 'super_admin') {
+        // Notify super admin or dept admin (the other party)
+        if (user.role === 'super_admin' && task.assignedTo) chatNotifyTargets.add(task.assignedTo.toString());
+        if (user.role === 'department_admin' && task.createdBy) chatNotifyTargets.add(task.createdBy.toString());
+      } else if (commentChannel === 'staff') {
+        if (user.role === 'staff' && task.assignedTo) chatNotifyTargets.add(task.assignedTo.toString());
+        if (user.role === 'department_admin' && task.delegatedTo) chatNotifyTargets.add(task.delegatedTo.toString());
+      }
+    } else {
+      // 2-tier: notify all other participants
+      if (task.createdBy) chatNotifyTargets.add(task.createdBy.toString());
+      if (task.assignedTo) chatNotifyTargets.add(task.assignedTo.toString());
+      if (task.delegatedTo) chatNotifyTargets.add(task.delegatedTo.toString());
+    }
+    chatNotifyTargets.delete(user._id.toString());
+
+    for (const recipientId of chatNotifyTargets) {
+      createNotification(
+        recipientId,
+        'new_chat_message',
+        'New Chat Message',
+        `${user.name || 'Someone'} sent a message on Task #${task.taskId || ''} "${task.title}".`,
+        task._id,
+        user._id
+      );
     }
 
     return res.status(201).json({

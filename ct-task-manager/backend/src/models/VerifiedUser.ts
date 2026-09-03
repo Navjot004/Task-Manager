@@ -6,6 +6,7 @@ export interface IVerifiedUser extends Document {
   email: string;
   phone: string;
   department: string | null;
+  userType: 'staff' | 'student';
   isRegistered: boolean;
   registeredUserId: mongoose.Types.ObjectId | null;
   createdAt: Date;
@@ -52,6 +53,13 @@ const verifiedUserSchema = new Schema<IVerifiedUser>(
       type: String,
       default: null,
       trim: true,
+    },
+
+    userType: {
+      type: String,
+      enum: ['staff', 'student'],
+      default: 'staff',
+      index: true,
     },
 
     isRegistered: {

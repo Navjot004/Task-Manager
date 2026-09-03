@@ -74,6 +74,11 @@ export const COLUMN_MAP: Record<string, string> = {
   'department': 'department',
   'dept': 'department',
   'dept.': 'department',
+  'type': 'userType',
+  'user type': 'userType',
+  'usertype': 'userType',
+  'role': 'userType',
+  'category': 'userType',
 };
 
 export const REQUIRED_FIELDS = ['universityId', 'name', 'email', 'phone'];
@@ -90,6 +95,7 @@ export interface ParsedVerifiedUser {
   email: string;
   phone: string;
   department: string | null;
+  userType: 'staff' | 'student';
 }
 
 export interface ImportResult {

@@ -1,16 +1,39 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { api, Department } from '../services/api';
 import './SuperAdminDepartmentsPage.css';
-import { Building, Trash2, Plus } from 'lucide-react';
+import { 
+  Building, 
+  Trash2, 
+  Plus, 
+  MoreVertical, 
+  Shield, 
+  UserCheck, 
+  FileSpreadsheet, 
+  UserPlus, 
+  Check, 
+  X 
+} from 'lucide-react';
 
 const SuperAdminDepartmentsPage: React.FC = () => {
   const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Add Department Modal
   const [showAddModal, setShowAddModal] = useState(false);
   const [newDeptName, setNewDeptName] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Three-dots menu state
+  const [activeMenuDeptId, setActiveMenuDeptId] = useState<string | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // Permissions Modal state
+  const [permModalDept, setPermModalDept] = useState<Department | null>(null);
+  const [permAccess, setPermAccess] = useState<'none' | 'staff' | 'student' | 'both'>('none');
+  const [permCanAdd, setPermCanAdd] = useState(true);
+  const [permCanUpload, setPermCanUpload] = useState(true);
+  const [savingPerms, setSavingPerms] = useState(false);
 
   const fetchDepartments = async () => {
     try {
@@ -30,6 +53,21 @@ const SuperAdminDepartmentsPage: React.FC = () => {
     fetchDepartments();
   }, []);
 
+  // Close three dots menu on click outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setActiveMenuDeptId(null);
+      }
+    };
+    if (activeMenuDeptId) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [activeMenuDeptId]);
+
   const handleAddSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newDeptName.trim()) return;
@@ -48,6 +86,7 @@ const SuperAdminDepartmentsPage: React.FC = () => {
   };
 
   const handleDelete = async (id: string, name: string) => {
+    setActiveMenuDeptId(null);
     if (!window.confirm(`Are you sure you want to delete the department "${name}"?`)) return;
 
     try {
@@ -55,6 +94,51 @@ const SuperAdminDepartmentsPage: React.FC = () => {
       fetchDepartments();
     } catch (err: any) {
       alert(err.message);
+    }
+  };
+
+  const openPermissionsModal = (dept: Department) => {
+    setActiveMenuDeptId(null);
+    setPermModalDept(dept);
+    const access = dept.verifiedUserAccess === 'none' ? 'none' : 'staff';
+    setPermAccess(access);
+    setPermCanAdd(dept.canAddVerifiedUsers ?? true);
+    setPermCanUpload(dept.canUploadVerifiedUsers ?? true);
+  };
+
+  const handleSavePermissions = async () => {
+    if (!permModalDept) return;
+    try {
+      setSavingPerms(true);
+      await api.updateDepartmentPermissions(permModalDept._id, {
+        verifiedUserAccess: permAccess,
+        canAddVerifiedUsers: permCanAdd,
+        canUploadVerifiedUsers: permCanUpload,
+      });
+      setPermModalDept(null);
+      fetchDepartments();
+    } catch (err: any) {
+      alert(err.message || 'Failed to update department permissions');
+    } finally {
+      setSavingPerms(false);
+    }
+  };
+
+  const getAccessBadge = (access?: string) => {
+    switch (access) {
+      case 'staff':
+      case 'both':
+        return (
+          <span className="dept-perm-badge badge-staff">
+            <UserCheck size={12} /> Staff Access
+          </span>
+        );
+      default:
+        return (
+          <span className="dept-perm-badge badge-none">
+            <X size={12} /> No Access
+          </span>
+        );
     }
   };
 
@@ -81,20 +165,62 @@ const SuperAdminDepartmentsPage: React.FC = () => {
           ) : (
             departments.map((dept) => (
               <div key={dept._id} className="dept-card">
-                <div className="dept-card-content">
+                <div className="dept-card-main">
                   <div className="dept-icon-wrapper">
                     <Building size={24} className="dept-icon" />
                   </div>
-                  <h3 className="dept-card-title">{dept.name}</h3>
+                  <div className="dept-info">
+                    <h3 className="dept-card-title">{dept.name}</h3>
+                    <div className="dept-badge-row">
+                      {getAccessBadge(dept.verifiedUserAccess)}
+                      {dept.verifiedUserAccess !== 'none' && (
+                        <>
+                          {dept.canAddVerifiedUsers && (
+                            <span className="dept-sub-badge" title="Can add user info manually">
+                              +Add
+                            </span>
+                          )}
+                          {dept.canUploadVerifiedUsers && (
+                            <span className="dept-sub-badge" title="Can upload Excel/CSV">
+                              Excel
+                            </span>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  </div>
                 </div>
+
                 <div className="dept-card-actions">
-                  <button 
-                    className="dept-delete-btn"
-                    onClick={() => handleDelete(dept._id, dept.name)}
-                    title="Delete Department"
-                  >
-                    <Trash2 size={16} />
-                  </button>
+                  {/* Three dots menu container */}
+                  <div className="dept-menu-wrapper" ref={activeMenuDeptId === dept._id ? menuRef : null}>
+                    <button 
+                      className={`dept-dots-btn ${activeMenuDeptId === dept._id ? 'active' : ''}`}
+                      onClick={() => setActiveMenuDeptId(activeMenuDeptId === dept._id ? null : dept._id)}
+                      title="Options"
+                    >
+                      <MoreVertical size={18} />
+                    </button>
+
+                    {activeMenuDeptId === dept._id && (
+                      <div className="dept-dropdown-menu">
+                        <button 
+                          className="dept-dropdown-item"
+                          onClick={() => openPermissionsModal(dept)}
+                        >
+                          <Shield size={15} className="dept-item-icon blue" />
+                          <span>Admin Permissions</span>
+                        </button>
+                        <button 
+                          className="dept-dropdown-item danger"
+                          onClick={() => handleDelete(dept._id, dept.name)}
+                        >
+                          <Trash2 size={15} className="dept-item-icon red" />
+                          <span>Delete Department</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             ))
@@ -102,6 +228,7 @@ const SuperAdminDepartmentsPage: React.FC = () => {
         </div>
       </div>
 
+      {/* ─── Add Department Modal ─── */}
       {showAddModal && (
         <div className="modal-overlay">
           <div className="modal-content" style={{ maxWidth: '400px' }}>
@@ -144,6 +271,141 @@ const SuperAdminDepartmentsPage: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Department Admin Permissions Modal ─── */}
+      {permModalDept && (
+        <div className="modal-overlay">
+          <div className="dept-perms-modal">
+            <div className="dept-perms-header">
+              <div className="dept-perms-icon-box">
+                <Shield size={22} />
+              </div>
+              <div>
+                <h3 className="dept-perms-title">Admin Permissions</h3>
+                <p className="dept-perms-subtitle">{permModalDept.name}</p>
+              </div>
+              <button 
+                className="dept-perms-close-btn"
+                onClick={() => setPermModalDept(null)}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="dept-perms-body">
+              <div className="dept-perms-section">
+                <label className="dept-perms-section-label">
+                  Verified Users Directory Access
+                </label>
+                <p className="dept-perms-help">
+                  Select whether Department Admins of this department are permitted to access verified staff users.
+                </p>
+
+                <div className="dept-perms-options-grid" style={{ gridTemplateColumns: '1fr 1fr' }}>
+                  <div 
+                    className={`dept-perm-option-card ${permAccess === 'staff' || permAccess === 'both' ? 'selected' : ''}`}
+                    onClick={() => setPermAccess('staff')}
+                  >
+                    <div className="dept-option-radio">
+                      {(permAccess === 'staff' || permAccess === 'both') && <Check size={14} />}
+                    </div>
+                    <div className="dept-option-content">
+                      <div className="dept-option-title">
+                        <UserCheck size={16} /> Staff Directory Access
+                      </div>
+                      <p className="dept-option-desc">
+                        Admins can view and access the verified list of Department Staff.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div 
+                    className={`dept-perm-option-card ${permAccess === 'none' ? 'selected' : ''}`}
+                    onClick={() => setPermAccess('none')}
+                  >
+                    <div className="dept-option-radio">
+                      {permAccess === 'none' && <Check size={14} />}
+                    </div>
+                    <div className="dept-option-content">
+                      <div className="dept-option-title">
+                        <X size={16} /> No Access
+                      </div>
+                      <p className="dept-option-desc">
+                        Admins cannot access the verified users directory.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {permAccess !== 'none' && (
+                <div className="dept-perms-section" style={{ marginTop: '1.25rem' }}>
+                  <label className="dept-perms-section-label">
+                    Information Addition Privileges
+                  </label>
+                  <p className="dept-perms-help">
+                    Allow Admins to add staff details whose information is not yet in the verified list.
+                  </p>
+
+                  <div className="dept-perms-checkboxes">
+                    <label className="dept-toggle-row">
+                      <input 
+                        type="checkbox" 
+                        checked={permCanAdd} 
+                        onChange={(e) => setPermCanAdd(e.target.checked)} 
+                      />
+                      <div className="dept-toggle-text">
+                        <span className="dept-toggle-title">
+                          <UserPlus size={15} /> Allow Adding Info Directly
+                        </span>
+                        <span className="dept-toggle-desc">
+                          Admins can add staff info directly through the directory table.
+                        </span>
+                      </div>
+                    </label>
+
+                    <label className="dept-toggle-row">
+                      <input 
+                        type="checkbox" 
+                        checked={permCanUpload} 
+                        onChange={(e) => setPermCanUpload(e.target.checked)} 
+                      />
+                      <div className="dept-toggle-text">
+                        <span className="dept-toggle-title">
+                          <FileSpreadsheet size={15} /> Allow Excel / CSV Upload
+                        </span>
+                        <span className="dept-toggle-desc">
+                          Admins can bulk upload spreadsheets of staff for this department.
+                        </span>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="dept-perms-footer">
+              <button 
+                type="button" 
+                className="btn btn-secondary"
+                onClick={() => setPermModalDept(null)}
+                disabled={savingPerms}
+              >
+                Cancel
+              </button>
+              <button 
+                type="button" 
+                className="btn btn-primary"
+                onClick={handleSavePermissions}
+                disabled={savingPerms}
+                style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}
+              >
+                {savingPerms ? 'Saving...' : 'Save Permissions'}
+              </button>
+            </div>
           </div>
         </div>
       )}

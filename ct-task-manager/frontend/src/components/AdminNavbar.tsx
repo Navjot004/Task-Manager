@@ -36,12 +36,6 @@ const AdminNavbar: React.FC = () => {
           Users
         </NavLink>
         <NavLink 
-          to="/super-admin/verified-users" 
-          className={({ isActive }) => isActive ? 'active' : ''}
-        >
-          Verified Users
-        </NavLink>
-        <NavLink 
           to="/super-admin/staff-assignments" 
           className={({ isActive }) => isActive ? 'active' : ''}
         >

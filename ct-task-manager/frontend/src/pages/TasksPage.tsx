@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { api } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import TaskCard from '../components/TaskCard';
@@ -11,6 +12,7 @@ import './TasksPage.css';
 
 const TasksPage: React.FC = () => {
   const { currentUser: user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   
   const [tasks, setTasks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -117,6 +119,43 @@ const TasksPage: React.FC = () => {
       loadTasks();
     }
   }, [page, statusFilter, schoolFilter, taskTypeFilter, user, search, isCreatingTask]);
+
+  // Handle openTask / openChat from notification popup click
+  useEffect(() => {
+    const openTaskId = searchParams.get('openTask');
+    const openChat = searchParams.get('openChat') === 'true';
+
+    if (openTaskId) {
+      const found = tasks.find(t => t._id === openTaskId);
+      if (found) {
+        if (openChat) {
+          setChatTask(found);
+        } else {
+          setSelectedTask(found);
+        }
+        searchParams.delete('openTask');
+        searchParams.delete('openChat');
+        setSearchParams(searchParams, { replace: true });
+      } else {
+        api.getTaskById(openTaskId)
+          .then(res => {
+            if (res.data?.task) {
+              if (openChat) {
+                setChatTask(res.data.task);
+              } else {
+                setSelectedTask(res.data.task);
+              }
+            }
+          })
+          .catch(err => console.error('Error fetching target task from notification:', err))
+          .finally(() => {
+            searchParams.delete('openTask');
+            searchParams.delete('openChat');
+            setSearchParams(searchParams, { replace: true });
+          });
+      }
+    }
+  }, [searchParams, tasks]);
 
   // Client-side filtering & sorting
   const getFilteredAndSortedTasks = () => {

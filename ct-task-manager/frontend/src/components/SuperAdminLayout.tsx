@@ -1,52 +1,26 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { api } from '../services/api';
 import { 
   Building2, 
   LayoutDashboard, 
   FileText, 
   Users, 
-  ShieldCheck, 
   UserPlus, 
   Building, 
   BarChart2,
   Search,
-  Bell,
   Menu,
   LogOut
 } from 'lucide-react';
 import './SuperAdminLayout.css';
 import UserProfileDropdown from './UserProfileDropdown';
+import NotificationDropdown from './NotificationDropdown';
 
 const SuperAdminLayout: React.FC = () => {
   const { logout, currentUser } = useAuth();
   const navigate = useNavigate();
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
-  const [hasNotifications, setHasNotifications] = useState(false);
-
-  useEffect(() => {
-    const checkNotifications = async () => {
-      try {
-        // Simple logic for Super Admin: show dot if there are tasks awaiting review
-        const res = await api.getTasks({ limit: 1, status: 'submitted_for_review' });
-        if (res.data && res.data.pagination.total > 0) {
-          setHasNotifications(true);
-        } else {
-          setHasNotifications(false);
-        }
-      } catch (error) {
-        console.error("Error fetching notifications", error);
-      }
-    };
-
-    if (currentUser?.role === 'super_admin') {
-      checkNotifications();
-      // Optional: Poll every 60 seconds
-      const intervalId = setInterval(checkNotifications, 60000);
-      return () => clearInterval(intervalId);
-    }
-  }, [currentUser]);
 
   const handleLogout = () => {
     logout();
@@ -87,10 +61,6 @@ const SuperAdminLayout: React.FC = () => {
           <NavLink to="/super-admin/users" className={({ isActive }) => `sa-nav-item ${isActive ? 'active' : ''}`} onClick={() => setIsMobileSidebarOpen(false)}>
             <Users size={18} /> Users
           </NavLink>
-
-          <NavLink to="/super-admin/verified-users" className={({ isActive }) => `sa-nav-item ${isActive ? 'active' : ''}`} onClick={() => setIsMobileSidebarOpen(false)}>
-            <ShieldCheck size={18} /> Verified Users
-          </NavLink>
           <NavLink to="/super-admin/staff-manage" className={({ isActive }) => `sa-nav-item ${isActive ? 'active' : ''}`} onClick={() => setIsMobileSidebarOpen(false)}>
             <UserPlus size={18} /> Manage Staff
           </NavLink>
@@ -125,10 +95,7 @@ const SuperAdminLayout: React.FC = () => {
             </div>
           </div>
           <div className="sa-topbar-right">
-            <button className="sa-notification-btn" onClick={() => navigate('/super-admin/tasks')}>
-              <Bell size={20} />
-              {hasNotifications && <span className="sa-notification-badge"></span>}
-            </button>
+            <NotificationDropdown />
             <UserProfileDropdown 
               user={currentUser}
               roleLabel="Super Admin"
@@ -149,3 +116,4 @@ const SuperAdminLayout: React.FC = () => {
 };
 
 export default SuperAdminLayout;
+

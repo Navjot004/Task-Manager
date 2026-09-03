@@ -1,23 +1,36 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard, 
   CheckSquare, 
   Users, 
   Search, 
-  Bell, 
   LogOut, 
   Menu, 
-  ShieldHalf 
+  ShieldHalf,
+  ShieldCheck
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { api } from '../services/api';
 import './DeptAdminLayout.css';
 import UserProfileDropdown from './UserProfileDropdown';
+import NotificationDropdown from './NotificationDropdown';
 
 const DeptAdminLayout: React.FC = () => {
   const { currentUser: user, logout } = useAuth();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [canAccessVerified, setCanAccessVerified] = useState(false);
+
+  useEffect(() => {
+    api.getMyDepartmentPermissions()
+      .then(res => {
+        if (res.success && res.data.verifiedUserAccess && res.data.verifiedUserAccess !== 'none') {
+          setCanAccessVerified(true);
+        }
+      })
+      .catch(err => console.error('Failed to fetch dept permissions', err));
+  }, [user]);
 
   const handleLogout = () => {
     logout();
@@ -28,6 +41,7 @@ const DeptAdminLayout: React.FC = () => {
     { to: "/admin", icon: <LayoutDashboard size={20} />, label: "Dashboard", end: true },
     { to: "/admin/tasks", icon: <CheckSquare size={20} />, label: "Team Tasks" },
     { to: "/admin/staff", icon: <Users size={20} />, label: "Manage Team" },
+    ...(canAccessVerified ? [{ to: "/admin/verified-users", icon: <ShieldCheck size={20} />, label: "Verified Users" }] : []),
   ];
 
   return (
@@ -101,10 +115,7 @@ const DeptAdminLayout: React.FC = () => {
           </div>
 
           <div className="dept-topbar-right">
-            <div className="dept-notification">
-              <Bell size={20} />
-              <div className="dept-notification-badge"></div>
-            </div>
+            <NotificationDropdown />
 
             <UserProfileDropdown 
               user={user}
@@ -126,3 +137,4 @@ const DeptAdminLayout: React.FC = () => {
 };
 
 export default DeptAdminLayout;
+

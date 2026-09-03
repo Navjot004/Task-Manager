@@ -4,13 +4,13 @@ import {
   LayoutDashboard, 
   CheckSquare, 
   Search, 
-  Bell, 
   Shield,
   Menu
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import './StaffLayout.css';
 import UserProfileDropdown from './UserProfileDropdown';
+import NotificationDropdown from './NotificationDropdown';
 
 const StaffLayout: React.FC = () => {
   const { currentUser: user } = useAuth();
@@ -79,10 +79,7 @@ const StaffLayout: React.FC = () => {
           </div>
 
           <div className="staff-topbar-right">
-            <div className="staff-notification">
-              <Bell size={20} />
-              <div className="staff-notification-badge"></div>
-            </div>
+            <NotificationDropdown />
 
             <UserProfileDropdown 
               user={user}
@@ -104,3 +101,4 @@ const StaffLayout: React.FC = () => {
 };
 
 export default StaffLayout;
+

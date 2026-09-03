@@ -44,6 +44,7 @@ export interface VerifiedUser {
   email: string;
   phone: string;
   department: string | null;
+  userType?: 'staff' | 'student';
   isRegistered: boolean;
   createdAt: string;
   updatedAt: string;
@@ -115,6 +116,9 @@ export interface Task {
 export interface Department {
   _id: string;
   name: string;
+  verifiedUserAccess?: 'none' | 'staff' | 'student' | 'both';
+  canAddVerifiedUsers?: boolean;
+  canUploadVerifiedUsers?: boolean;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -195,20 +199,45 @@ export const api = {
     limit?: number;
     search?: string;
     status?: string;
+    userType?: string;
+    department?: string;
   }): Promise<{ success: boolean; data: { users: VerifiedUser[]; pagination: Pagination } }> => {
     const query = new URLSearchParams();
     if (params.page) query.set('page', String(params.page));
     if (params.limit) query.set('limit', String(params.limit));
     if (params.search) query.set('search', params.search);
     if (params.status) query.set('status', params.status);
+    if (params.userType) query.set('userType', params.userType);
+    if (params.department) query.set('department', params.department);
 
     return fetchWithAuth(`/api/verified-users?${query.toString()}`);
+  },
+
+  createVerifiedUser: async (userData: {
+    universityId: string;
+    name: string;
+    email: string;
+    phone: string;
+    department?: string | null;
+    userType?: 'staff' | 'student';
+  }): Promise<{ success: boolean; message: string; data: { user: VerifiedUser } }> => {
+    return fetchWithAuth('/api/verified-users', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(userData),
+    });
+  },
+
+  deleteVerifiedUser: async (id: string): Promise<{ success: boolean; message: string }> => {
+    return fetchWithAuth(`/api/verified-users/${id}`, {
+      method: 'DELETE',
+    });
   },
 
   /**
    * Get verified user statistics.
    */
-  getVerifiedUserStats: async (): Promise<{ success: boolean; data: VerifiedUserStats }> => {
+  getVerifiedUserStats: async (): Promise<{ success: boolean; data: VerifiedUserStats & { staffCount?: number; studentCount?: number } }> => {
     return fetchWithAuth(`/api/verified-users/stats`);
   },
 
@@ -229,11 +258,38 @@ export const api = {
     return json;
   },
 
+  getMyDepartmentPermissions: async (): Promise<{
+    success: boolean;
+    data: {
+      department: string | null;
+      verifiedUserAccess: 'none' | 'staff' | 'student' | 'both';
+      canAddVerifiedUsers: boolean;
+      canUploadVerifiedUsers: boolean;
+    };
+  }> => {
+    return fetchWithAuth('/api/departments/my-permissions');
+  },
+
   createDepartment: async (name: string): Promise<{ success: boolean; message: string; data: { department: Department } }> => {
     return fetchWithAuth('/api/departments', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name }),
+    });
+  },
+
+  updateDepartmentPermissions: async (
+    id: string,
+    permissions: {
+      verifiedUserAccess?: 'none' | 'staff' | 'student' | 'both';
+      canAddVerifiedUsers?: boolean;
+      canUploadVerifiedUsers?: boolean;
+    }
+  ): Promise<{ success: boolean; message: string; data: { department: Department } }> => {
+    return fetchWithAuth(`/api/departments/${id}/permissions`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(permissions),
     });
   },
 
@@ -580,5 +636,28 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ channel }),
     });
+  },
+
+  // ─── Notifications ──────────────────────────────────────────
+
+  getNotifications: async (params?: { page?: number; limit?: number; filter?: string }) => {
+    const searchParams = new URLSearchParams();
+    if (params?.page) searchParams.set('page', String(params.page));
+    if (params?.limit) searchParams.set('limit', String(params.limit));
+    if (params?.filter) searchParams.set('filter', params.filter);
+    const qs = searchParams.toString();
+    return fetchWithAuth(`/api/notifications${qs ? `?${qs}` : ''}`);
+  },
+
+  getUnreadNotificationCount: async (): Promise<{ success: boolean; count: number }> => {
+    return fetchWithAuth('/api/notifications/unread-count');
+  },
+
+  markNotificationRead: async (id: string) => {
+    return fetchWithAuth(`/api/notifications/${id}/read`, { method: 'PATCH' });
+  },
+
+  markAllNotificationsRead: async () => {
+    return fetchWithAuth('/api/notifications/read-all', { method: 'PATCH' });
   }
 };

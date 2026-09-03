@@ -94,7 +94,8 @@ const validateHeaders = (rawRow: Record<string, unknown>): string[] => {
  */
 export const importVerifiedUsers = async (
   buffer: Buffer,
-  originalName: string
+  originalName: string,
+  options?: { departmentOverride?: string; defaultUserType?: 'staff' | 'student' }
 ): Promise<ImportResult> => {
   const rawRows = parseFile(buffer, originalName);
 
@@ -148,6 +149,11 @@ export const importVerifiedUsers = async (
     }
     seenIds.set(mapped.universityId, rowNumber);
 
+    const rawType = (mapped.userType || '').toLowerCase().trim();
+    const userType: 'staff' | 'student' = rawType.includes('student')
+      ? 'student'
+      : (options?.defaultUserType || 'staff');
+
     parsedRows.push({
       rowNumber,
       data: {
@@ -155,7 +161,8 @@ export const importVerifiedUsers = async (
         name: mapped.name,
         email: mapped.email,
         phone: mapped.phone,
-        department: mapped.department || null,
+        department: options?.departmentOverride || mapped.department || null,
+        userType,
       },
     });
   }
@@ -173,6 +180,7 @@ export const importVerifiedUsers = async (
         existing.email = data.email;
         existing.phone = data.phone;
         existing.department = data.department;
+        existing.userType = data.userType;
         await existing.save();
         result.updated++;
       } else {

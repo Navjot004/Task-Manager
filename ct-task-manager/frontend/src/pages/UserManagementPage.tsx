@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { api, User } from '../services/api';
 import { 
   Search, 
-  UserPlus, 
   MoreVertical, 
   Mail, 
   ChevronLeft, 
@@ -14,6 +14,7 @@ import {
 import './UserManagementPage.css';
 
 const UserManagementPage: React.FC = () => {
+  const navigate = useNavigate();
   const [users, setUsers] = useState<User[]>([]);
   
   const [page, setPage] = useState(1);
@@ -154,8 +155,12 @@ const UserManagementPage: React.FC = () => {
           </select>
         </div>
         
-        <button className="btn-add-user" onClick={() => alert('Add User functionality coming soon!')}>
-          <UserPlus size={16} /> Add User
+        <button 
+          className="btn-add-user" 
+          onClick={() => navigate('/super-admin/verified-users')}
+          title="Open Verified Users Directory"
+        >
+          <ShieldCheck size={16} /> Verified Users
         </button>
       </div>
 

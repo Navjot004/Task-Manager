@@ -43,6 +43,7 @@ const AppRouter = () => {
             <Route path="departments" element={<SuperAdminDepartmentsPage />} />
             <Route path="naac" element={<NaacDashboardPage />} />
             <Route path="profile" element={<ProfilePage />} />
+            <Route path="notifications" element={<Navigate to="/super-admin/tasks" replace />} />
             <Route path="alerts" element={<div>Alerts Work In Progress</div>} />
             <Route path="more" element={<div>More Options</div>} />
           </Route>
@@ -56,7 +57,9 @@ const AppRouter = () => {
             <Route index element={<AdminPage />} />
             <Route path="staff" element={<DeptAdminStaffPage />} />
             <Route path="tasks" element={<TasksPage />} />
+            <Route path="verified-users" element={<VerifiedUsersPage />} />
             <Route path="profile" element={<ProfilePage />} />
+            <Route path="notifications" element={<Navigate to="/admin/tasks" replace />} />
           </Route>
 
           {/* Staff Routes */}
@@ -68,6 +71,7 @@ const AppRouter = () => {
             <Route index element={<StaffPage />} />
             <Route path="tasks" element={<TasksPage />} />
             <Route path="profile" element={<ProfilePage />} />
+            <Route path="notifications" element={<Navigate to="/staff/tasks" replace />} />
           </Route>
         </Routes>
       </BrowserRouter>
@@ -76,3 +80,4 @@ const AppRouter = () => {
 };
 
 export default AppRouter;
+
