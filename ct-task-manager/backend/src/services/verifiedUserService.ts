@@ -1,3 +1,4 @@
+import { Buffer } from 'buffer';
 import * as XLSX from 'xlsx';
 import {
   COLUMN_MAP,
