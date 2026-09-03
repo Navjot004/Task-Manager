@@ -1,0 +1,76 @@
+/* Logo Container */
+.pbl-container,
+.pbl-default {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  transition: all 0.2s ease;
+}
+
+/* Default Icon styling */
+.pbl-default {
+  background: #eff6ff;
+  color: #2563eb;
+  border: 1px solid #bfdbfe;
+}
+
+/* Sizing & Dimensions */
+/* Small */
+.pbl-container.size-small,
+.pbl-default.size-small {
+  width: 26px;
+  height: 26px;
+}
+.pbl-container.size-small.shape-rectangle,
+.pbl-default.size-small.shape-rectangle {
+  width: 44px;
+  height: 22px;
+}
+
+/* Medium (Default) */
+.pbl-container.size-medium,
+.pbl-default.size-medium {
+  width: 34px;
+  height: 34px;
+}
+.pbl-container.size-medium.shape-rectangle,
+.pbl-default.size-medium.shape-rectangle {
+  width: 60px;
+  height: 30px;
+}
+
+/* Large */
+.pbl-container.size-large,
+.pbl-default.size-large {
+  width: 44px;
+  height: 44px;
+}
+.pbl-container.size-large.shape-rectangle,
+.pbl-default.size-large.shape-rectangle {
+  width: 80px;
+  height: 40px;
+}
+
+/* Shapes */
+.shape-circle {
+  border-radius: 50% !important;
+}
+
+.shape-square {
+  border-radius: 8px !important;
+}
+
+.shape-rectangle {
+  border-radius: 6px !important;
+}
+
+/* Image */
+.pbl-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}

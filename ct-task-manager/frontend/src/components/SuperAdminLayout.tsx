@@ -1,31 +1,27 @@
 import React, { useState } from 'react';
-import { Outlet, NavLink, useNavigate } from 'react-router-dom';
+import { Outlet, NavLink } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { 
-  Building2, 
   LayoutDashboard, 
   FileText, 
   Users, 
   UserPlus, 
+  UserCheck, 
   Building, 
   BarChart2,
   Search,
-  Menu,
-  LogOut
+  Menu
 } from 'lucide-react';
 import './SuperAdminLayout.css';
 import UserProfileDropdown from './UserProfileDropdown';
 import NotificationDropdown from './NotificationDropdown';
+import { useSettings } from '../context/SettingsContext';
+import PortalBrandLogo from './PortalBrandLogo';
 
 const SuperAdminLayout: React.FC = () => {
-  const { logout, currentUser } = useAuth();
-  const navigate = useNavigate();
+  const { currentUser } = useAuth();
+  const { systemName } = useSettings();
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
-
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
-  };
 
   if (currentUser?.role !== 'super_admin') {
     return null; 
@@ -33,9 +29,10 @@ const SuperAdminLayout: React.FC = () => {
 
   return (
     <div className="sa-layout-container">
+      {/* Mobile Backdrop */}
       {isMobileSidebarOpen && (
         <div 
-          className="sa-sidebar-overlay" 
+          className="sa-sidebar-backdrop" 
           onClick={() => setIsMobileSidebarOpen(false)} 
         />
       )}
@@ -43,10 +40,8 @@ const SuperAdminLayout: React.FC = () => {
       {/* Sidebar (Desktop & Mobile) */}
       <aside className={`sa-sidebar ${isMobileSidebarOpen ? 'mobile-open' : ''}`}>
         <div className="sa-sidebar-header">
-          <div className="sa-sidebar-logo">
-            <Building2 size={20} />
-          </div>
-          <span className="sa-sidebar-title">CT UNI TMS</span>
+          <PortalBrandLogo />
+          <span className="sa-sidebar-title">{systemName}</span>
         </div>
         
         <div className="sa-sidebar-section-title">Super Admin</div>
@@ -58,8 +53,11 @@ const SuperAdminLayout: React.FC = () => {
           <NavLink to="/super-admin/tasks" className={({ isActive }) => `sa-nav-item ${isActive ? 'active' : ''}`} onClick={() => setIsMobileSidebarOpen(false)}>
             <FileText size={18} /> Tasks
           </NavLink>
+          <NavLink to="/super-admin/team" className={({ isActive }) => `sa-nav-item ${isActive ? 'active' : ''}`} onClick={() => setIsMobileSidebarOpen(false)}>
+            <Users size={18} /> Manage Team
+          </NavLink>
           <NavLink to="/super-admin/users" className={({ isActive }) => `sa-nav-item ${isActive ? 'active' : ''}`} onClick={() => setIsMobileSidebarOpen(false)}>
-            <Users size={18} /> Users
+            <UserCheck size={18} /> Users
           </NavLink>
           <NavLink to="/super-admin/staff-manage" className={({ isActive }) => `sa-nav-item ${isActive ? 'active' : ''}`} onClick={() => setIsMobileSidebarOpen(false)}>
             <UserPlus size={18} /> Manage Staff
@@ -71,12 +69,6 @@ const SuperAdminLayout: React.FC = () => {
             <BarChart2 size={18} /> NAAC Dashboard
           </NavLink>
         </nav>
-
-        <div className="sa-sidebar-footer">
-          <button className="sa-nav-item sa-logout-btn" onClick={handleLogout}>
-            <LogOut size={18} /> Logout
-          </button>
-        </div>
       </aside>
 
       <main className="sa-main-content">

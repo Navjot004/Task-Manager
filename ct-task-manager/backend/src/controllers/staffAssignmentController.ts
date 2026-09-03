@@ -38,8 +38,8 @@ export const createAssignment = async (req: Request, res: Response) => {
     const admin = await User.findById(adminId);
     if (!admin) return res.status(404).json({ success: false, message: 'Target admin not found.' });
     if (!admin.isActive) return res.status(400).json({ success: false, message: 'Target admin is inactive.' });
-    if (admin.role !== 'department_admin') {
-      return res.status(400).json({ success: false, message: 'Target admin must have department_admin role.' });
+    if (admin.role !== 'department_admin' && admin.role !== 'super_admin') {
+      return res.status(400).json({ success: false, message: 'Target admin must have department_admin or super_admin role.' });
     }
     if (req.user.role === 'department_admin' && req.user._id.toString() !== adminId) {
       return res.status(403).json({ success: false, message: 'Forbidden. You can only assign staff to your own roster.' });

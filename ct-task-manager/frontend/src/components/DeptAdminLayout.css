@@ -1,4 +1,5 @@
-.dept-admin-layout {
+.dept-admin-layout,
+.dept-layout {
   display: flex;
   height: 100vh;
   max-height: 100vh;

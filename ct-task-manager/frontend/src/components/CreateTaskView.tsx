@@ -117,7 +117,7 @@ const CreateTaskView: React.FC<CreateTaskViewProps> = ({ onSubmit, onCancel, ava
   
   const [isAssignDropdownOpen, setIsAssignDropdownOpen] = useState(false);
   const [assignSearchQuery, setAssignSearchQuery] = useState('');
-  const [assignRoleFilter, setAssignRoleFilter] = useState<'all' | 'admin' | 'staff'>('all');
+  const [assignRoleFilter, setAssignRoleFilter] = useState<'all' | 'team' | 'admin' | 'staff'>('all');
   const [assignDeptFilter, setAssignDeptFilter] = useState<string>('all');
   const [departmentList, setDepartmentList] = useState<string[]>([]);
   const assignDropdownRef = useRef<HTMLDivElement>(null);
@@ -216,19 +216,23 @@ const CreateTaskView: React.FC<CreateTaskViewProps> = ({ onSubmit, onCancel, ava
     const isMe = currentUser && (userObj._id === currentUser.id || userObj.id === currentUser.id);
     const name = isMe ? 'me' : userObj.name;
     const staffId = userObj.universityId ? ` (ID: ${userObj.universityId})` : '';
-    const dept = userObj.department ? ` • ${userObj.department}` : '';
+    const dept = userObj.isSuperAdminTeamMember ? ' • Super Admin Team' : (userObj.department ? ` • ${userObj.department}` : '');
     return `${name}${staffId}${dept}`;
   };
 
   const filteredAssignees = availableAssignees.filter(a => {
-    // Role filter
-    if (assignRoleFilter === 'admin' && !a.role?.includes('admin')) return false;
-    if (assignRoleFilter === 'staff' && a.role !== 'staff') return false;
-    
-    // Department filter (for Super Admin)
-    if (currentUser?.role === 'super_admin' && assignDeptFilter !== 'all') {
-      if (!a.department || a.department.trim().toLowerCase() !== assignDeptFilter.trim().toLowerCase()) {
-        return false;
+    // Role / Team filter
+    if (assignRoleFilter === 'team') {
+      if (!a.isSuperAdminTeamMember) return false;
+    } else {
+      if (assignRoleFilter === 'admin' && !a.role?.includes('admin')) return false;
+      if (assignRoleFilter === 'staff' && a.role !== 'staff') return false;
+      
+      // Department filter (only applies when not in My Team)
+      if (currentUser?.role === 'super_admin' && assignDeptFilter !== 'all') {
+        if (!a.department || a.department.trim().toLowerCase() !== assignDeptFilter.trim().toLowerCase()) {
+          return false;
+        }
       }
     }
 
@@ -447,15 +451,20 @@ const CreateTaskView: React.FC<CreateTaskViewProps> = ({ onSubmit, onCancel, ava
                             <Building2 size={13} className="ct-dept-filter-icon" />
                             <select 
                               className="ct-dept-filter-select"
-                              value={assignDeptFilter}
+                              value={assignRoleFilter === 'team' ? 'all' : assignDeptFilter}
                               onChange={(e) => {
                                 e.stopPropagation();
                                 setAssignDeptFilter(e.target.value);
                               }}
                               onClick={(e) => e.stopPropagation()}
+                              disabled={assignRoleFilter === 'team'}
+                              style={assignRoleFilter === 'team' ? { opacity: 0.55, cursor: 'not-allowed', backgroundColor: '#f1f5f9' } : {}}
+                              title={assignRoleFilter === 'team' ? 'Department filter is disabled for My Team' : undefined}
                             >
-                              <option value="all">All Departments ({availableAssignees.length})</option>
-                              {departmentList.map(dept => {
+                              <option value="all">
+                                {assignRoleFilter === 'team' ? 'Department: N/A (My Team)' : `All Departments (${availableAssignees.length})`}
+                              </option>
+                              {assignRoleFilter !== 'team' && departmentList.map(dept => {
                                 const count = availableAssignees.filter(a => a.department && a.department.toLowerCase() === dept.toLowerCase()).length;
                                 return (
                                   <option key={dept} value={dept}>
@@ -472,6 +481,15 @@ const CreateTaskView: React.FC<CreateTaskViewProps> = ({ onSubmit, onCancel, ava
                               className={`ct-role-filter-btn ${assignRoleFilter === 'all' ? 'active' : ''}`}
                               onClick={(e) => { e.stopPropagation(); setAssignRoleFilter('all'); }}
                             >All</button>
+                            <button 
+                              type="button"
+                              className={`ct-role-filter-btn ${assignRoleFilter === 'team' ? 'active' : ''}`}
+                              onClick={(e) => { 
+                                e.stopPropagation(); 
+                                setAssignRoleFilter('team'); 
+                                setAssignDeptFilter('all'); 
+                              }}
+                            >My Team</button>
                             <button 
                               type="button"
                               className={`ct-role-filter-btn ${assignRoleFilter === 'admin' ? 'active' : ''}`}
@@ -515,12 +533,17 @@ const CreateTaskView: React.FC<CreateTaskViewProps> = ({ onSubmit, onCancel, ava
                             <div className="ct-assignee-info">
                               <div className="ct-assignee-primary">
                                 <span className="ct-assignee-name">{currentUser && (userId === currentUser.id || userId === currentUser._id) ? 'me' : a.name}</span>
+                                {a.isSuperAdminTeamMember && (
+                                  <span className="ct-role-tag" style={{ background: '#eff6ff', color: '#2563eb', borderColor: '#bfdbfe' }}>
+                                    Team
+                                  </span>
+                                )}
                                 {a.role?.includes('admin') && <span className="ct-role-tag admin">Admin</span>}
-                                {a.role === 'staff' && <span className="ct-role-tag staff">Staff</span>}
+                                {a.role === 'staff' && !a.isSuperAdminTeamMember && <span className="ct-role-tag staff">Staff</span>}
                               </div>
-                              {a.department && (
-                                <span className="ct-assignee-dept">{a.department}</span>
-                              )}
+                              <span className="ct-assignee-dept">
+                                {a.isSuperAdminTeamMember ? 'Super Admin Team' : (a.department || '')}
+                              </span>
                             </div>
                             <span className="ct-assignee-role">ID: {a.universityId || 'N/A'}</span>
                           </li>

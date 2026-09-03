@@ -19,9 +19,10 @@ const AdminPage: React.FC = () => {
     const fetchData = async () => {
       try {
         if (!user) return;
+        const adminId = user.id || (user as any)._id || '';
         const [tasksRes, teamRes] = await Promise.all([
           api.getTasks({}),
-          api.getAdminAssignments(user.id)
+          adminId ? api.getAdminAssignments(adminId) : Promise.resolve({ success: true, data: { assignments: [] } })
         ]);
         
         // Filter tasks that belong to the department
@@ -29,7 +30,7 @@ const AdminPage: React.FC = () => {
         // The backend might already filter them, but let's be safe if it doesn't.
         setTasks(tasksRes.data.tasks || []);
         
-        const assignments = teamRes.data.assignments || [];
+        const assignments = teamRes.data?.assignments || [];
         // Map assignments to staff users
         setTeam(assignments.map(a => a.staffId).filter(Boolean));
       } catch (err) {
@@ -49,6 +50,7 @@ const AdminPage: React.FC = () => {
   const activeTasks = tasks.filter(t => t.status !== 'completed' && t.status !== 'approved');
   const highPriorityTasks = activeTasks.filter(t => calculateUrgency(t) === 'RED' || calculateUrgency(t) === 'OVERDUE');
   const pendingReviewTasks = tasks.filter(t => t.status === 'submitted_for_review' && t.reviewStage === 'department_admin');
+  const highPriorityPct = activeTasks.length > 0 ? (highPriorityTasks.length / activeTasks.length) * 100 : 0;
   
   return (
     <div className="admin-dashboard">
@@ -80,7 +82,7 @@ const AdminPage: React.FC = () => {
             </div>
             <div className="admin-widget-sub">{highPriorityTasks.length} High Priority</div>
             <div className="admin-widget-bars">
-              {highPriorityTasks.length > 0 && <div className="admin-widget-bar" style={{ background: '#ef4444', width: `${(highPriorityTasks.length / activeTasks.length) * 100}%` }}></div>}
+              {highPriorityTasks.length > 0 && <div className="admin-widget-bar" style={{ background: '#ef4444', width: `${highPriorityPct}%` }}></div>}
               <div className="admin-widget-bar" style={{ background: '#3b82f6', flex: 1 }}></div>
             </div>
           </div>

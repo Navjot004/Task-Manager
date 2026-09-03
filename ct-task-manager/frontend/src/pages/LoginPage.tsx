@@ -1,13 +1,16 @@
 import React, { useState } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { IdCard, Lock, Eye, EyeOff, ShieldCheck, GraduationCap } from 'lucide-react';
+import { IdCard, Lock, Eye, EyeOff, ShieldCheck } from 'lucide-react';
+import { useSettings } from '../context/SettingsContext';
+import PortalBrandLogo from '../components/PortalBrandLogo';
 import './LoginPage.css';
 
 const LoginPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { login } = useAuth();
+  const { systemName } = useSettings();
 
   const [formData, setFormData] = useState({
     universityId: '',
@@ -55,11 +58,9 @@ const LoginPage = () => {
         {/* Left Panel (Desktop only) */}
         <div className="login-left-panel">
           <div className="login-left-header">
-            <div className="login-logo-placeholder">
-              <GraduationCap size={28} />
-            </div>
+            <PortalBrandLogo />
             <div className="login-university-title">
-              <span className="uni-name">CT University</span>
+              <span className="uni-name">{systemName}</span>
               <span className="portal-label">Portal Access</span>
             </div>
           </div>
@@ -78,10 +79,10 @@ const LoginPage = () => {
           
           {/* Mobile Header (Hidden on Desktop) */}
           <div className="login-mobile-header">
-            <div className="login-mobile-logo-wrap">
-              <GraduationCap size={32} />
+            <div className="login-mobile-logo-wrap" style={{ display: 'flex', justifyContent: 'center', marginBottom: '0.75rem' }}>
+              <PortalBrandLogo />
             </div>
-            <h1>CT University</h1>
+            <h1>{systemName}</h1>
             <p>Faculty & Administration Portal</p>
           </div>
 

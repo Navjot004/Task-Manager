@@ -22,8 +22,14 @@ const fetchWithAuth = async (endpoint: string, options: RequestInit = {}) => {
     headers,
   });
 
-  const json = await response.json();
+  const json = await response.json().catch(() => ({ message: 'API request failed' }));
   if (!response.ok) {
+    if (response.status === 401 && token) {
+      tokenStorage.clearToken();
+      if (typeof window !== 'undefined' && !window.location.pathname.includes('/login') && !window.location.pathname.includes('/register')) {
+        window.location.href = '/login';
+      }
+    }
     throw new Error(json.message || 'API request failed');
   }
   return json;
@@ -491,7 +497,7 @@ export const api = {
     return json;
   },
 
-  getTasks: async (params: { page?: number; limit?: number; search?: string; status?: string; assignee?: string; sortBy?: string; workflow?: string; reviewStage?: string; taskType?: string; department?: string }): Promise<{ success: boolean; data: { tasks: any[]; pagination: Pagination } }> => {
+  getTasks: async (params: { page?: number; limit?: number; search?: string; status?: string; assignee?: string; sortBy?: string; workflow?: string; reviewStage?: string; taskType?: string; department?: string; teamOnly?: string }): Promise<{ success: boolean; data: { tasks: any[]; pagination: Pagination } }> => {
     const query = new URLSearchParams();
     if (params.page) query.set('page', String(params.page));
     if (params.limit) query.set('limit', String(params.limit));
@@ -503,6 +509,7 @@ export const api = {
     if (params.reviewStage) query.set('reviewStage', params.reviewStage);
     if (params.taskType) query.set('taskType', params.taskType);
     if (params.department) query.set('department', params.department);
+    if (params.teamOnly) query.set('teamOnly', params.teamOnly);
 
     return fetchWithAuth(`/api/tasks?${query.toString()}`);
   },
@@ -659,5 +666,46 @@ export const api = {
 
   markAllNotificationsRead: async () => {
     return fetchWithAuth('/api/notifications/read-all', { method: 'PATCH' });
+  },
+
+  // ─── System Settings ──────────────────────────────────────────
+
+  getSettings: async (): Promise<{ success: boolean; data: { systemName: string; [key: string]: any } }> => {
+    try {
+      const res = await fetch(`${API_URL}/api/settings`);
+      const json = await res.json();
+      if (res.ok && json.data) {
+        return json;
+      }
+      return { success: true, data: { systemName: 'Task-Manage' } };
+    } catch (e) {
+      return { success: true, data: { systemName: 'Task-Manage' } };
+    }
+  },
+
+  updateSettings: async (settings: { systemName?: string; logoUrl?: string | null; logoShape?: string; logoSize?: string }): Promise<{ success: boolean; data: any; message: string }> => {
+    const response = await fetch(`${API_URL}/api/settings`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${tokenStorage.getToken()}`
+      },
+      body: JSON.stringify(settings)
+    });
+
+    let json: any;
+    try {
+      json = await response.json();
+    } catch {
+      if (response.status === 413) {
+        throw new Error('Image is too large for the server. Please try a smaller image or re-crop.');
+      }
+      throw new Error(`Server returned error status ${response.status}`);
+    }
+
+    if (!response.ok) {
+      throw new Error(json.message || 'Failed to update system settings');
+    }
+    return json;
   }
 };

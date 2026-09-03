@@ -9,14 +9,14 @@
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 2rem;
+  margin-bottom: 1.5rem;
 }
 
 .saa-title {
   font-size: 1.75rem;
   font-weight: 700;
   color: #0f172a;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.35rem;
   letter-spacing: -0.025em;
 }
 
@@ -25,14 +25,218 @@
   font-size: 0.95rem;
 }
 
-.saa-layout {
-  display: block;
+/* Filter Card */
+.saa-filter-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 1.15rem 1.25rem;
+  margin-bottom: 1.75rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
 }
 
-.saa-section {
+.saa-filter-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+/* Search Box */
+.saa-search-box {
+  position: relative;
+  flex: 1;
+  min-width: 260px;
+  display: flex;
+  align-items: center;
+}
+
+.saa-search-icon {
+  position: absolute;
+  left: 0.85rem;
+  color: #94a3b8;
+  pointer-events: none;
+}
+
+.saa-search-input {
   width: 100%;
+  padding: 0.6rem 2.2rem 0.6rem 2.4rem;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  color: #0f172a;
+  background: #ffffff;
+  transition: all 0.15s ease;
 }
 
+.saa-search-input:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.saa-clear-btn {
+  position: absolute;
+  right: 0.65rem;
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  padding: 0.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+}
+
+.saa-clear-btn:hover {
+  color: #0f172a;
+}
+
+/* Department Select */
+.saa-dept-select-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-width: 240px;
+}
+
+.saa-select-icon {
+  position: absolute;
+  left: 0.85rem;
+  color: #64748b;
+  pointer-events: none;
+}
+
+.saa-dept-select {
+  width: 100%;
+  padding: 0.6rem 1rem 0.6rem 2.3rem;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 8px;
+  font-size: 0.88rem;
+  color: #0f172a;
+  background: #ffffff;
+  cursor: pointer;
+  appearance: auto;
+  transition: all 0.15s ease;
+}
+
+.saa-dept-select:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.saa-reset-filter-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  color: #475569;
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 0.55rem 0.85rem;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.saa-reset-filter-btn:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+/* Role Tabs Row */
+.saa-role-tabs-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid #f1f5f9;
+}
+
+.saa-role-tabs {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: #f8fafc;
+  padding: 0.25rem;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+}
+
+.saa-role-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.75rem;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.saa-role-tab:hover {
+  color: #0f172a;
+}
+
+.saa-role-tab.active {
+  background: #ffffff;
+  color: #0f172a;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.saa-role-tab.active.admin-tab {
+  color: #b45309;
+}
+
+.saa-tab-count {
+  font-size: 0.75rem;
+  padding: 0.1rem 0.45rem;
+  background: #e2e8f0;
+  color: #475569;
+  border-radius: 10px;
+}
+
+.saa-role-tab.active .saa-tab-count {
+  background: #0f172a;
+  color: #ffffff;
+}
+
+.saa-tab-count.admin-badge {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.saa-role-tab.active .saa-tab-count.admin-badge {
+  background: #f59e0b;
+  color: #ffffff;
+}
+
+.saa-results-info {
+  font-size: 0.85rem;
+  color: #64748b;
+}
+
+.saa-top-note {
+  font-size: 0.78rem;
+  color: #b45309;
+  margin-left: 0.35rem;
+  font-weight: 500;
+}
+
+/* Card Grid */
 .saa-card-list {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
@@ -41,37 +245,153 @@
 }
 
 .saa-card {
-  background: white;
+  background: #ffffff;
   border-radius: 12px;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
   border: 1px solid #e2e8f0;
   overflow: hidden;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
   display: flex;
   flex-direction: column;
+  height: 100%;
+  transition: all 0.2s ease;
 }
 
 .saa-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08);
+}
+
+/* Card Highlighted if Admin */
+.saa-card.is-admin-card {
+  border-color: #fde68a;
+  box-shadow: 0 3px 6px -1px rgba(245, 158, 11, 0.08);
+  background: linear-gradient(180deg, #fffdfa 0%, #ffffff 100%);
 }
 
 .saa-card-header {
-  padding: 1.25rem;
+  padding: 1.15rem 1.25rem;
   border-bottom: 1px solid #f1f5f9;
-  display: flex;
-  justify-content: space-between;
+}
+
+.saa-admin-pill {
+  display: inline-flex;
   align-items: center;
+  gap: 0.25rem;
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fde68a;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.15rem 0.5rem;
+  border-radius: 9999px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
 }
 
 .saa-card-body {
-  padding: 1.25rem;
+  padding: 1.15rem 1.25rem;
   flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.saa-info-row {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-size: 0.85rem;
+  color: #475569;
+}
+
+.saa-info-icon {
+  color: #94a3b8;
+  flex-shrink: 0;
+}
+
+.saa-info-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.saa-card-footer {
+  padding: 1rem 1.25rem;
+  border-top: 1px solid #f1f5f9;
+  background: #f8fafc;
+}
+
+.saa-btn-remove-admin {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.5rem;
+  background: #fee2e2;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 0.55rem;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.saa-btn-remove-admin:hover {
+  background: #fecaca;
+}
+
+.saa-btn-promote {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 0.55rem;
+  border-radius: 8px;
+}
+
+/* Empty & Loading States */
+.saa-empty-state {
+  grid-column: 1 / -1;
+  padding: 3.5rem 1.5rem;
+  text-align: center;
+  background: #ffffff;
+  border: 1.5px dashed #cbd5e1;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.65rem;
+  color: #64748b;
+}
+
+.saa-empty-state h3 {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0;
+}
+
+.saa-empty-state p {
+  font-size: 0.9rem;
+  margin: 0 0 0.5rem;
+}
+
+.saa-loading-state {
+  grid-column: 1 / -1;
+  padding: 3rem;
+  text-align: center;
+  color: #64748b;
 }
 
 .badge {
-  padding: 0.25rem 0.6rem;
-  border-radius: 9999px; /* pill shape */
+  padding: 0.2rem 0.55rem;
+  border-radius: 9999px;
   font-size: 0.75rem;
   font-weight: 600;
   letter-spacing: 0.025em;
@@ -82,9 +402,3 @@
   color: #475569;
   border: 1px solid #e2e8f0;
 }
-
-/* Modal styling is inherited from global, but just in case */
-.form-control {
-  font-family: inherit;
-}
-

@@ -1,12 +1,15 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { api, Department } from '../services/api';
-import { Eye, EyeOff, Building2, Info } from 'lucide-react';
+import { Eye, EyeOff, Info } from 'lucide-react';
 import { useEffect } from 'react';
+import { useSettings } from '../context/SettingsContext';
+import PortalBrandLogo from '../components/PortalBrandLogo';
 import './RegisterPage.css';
 
 const RegisterPage = () => {
   const navigate = useNavigate();
+  const { systemName } = useSettings();
 
   const [formData, setFormData] = useState({
     universityId: '',
@@ -103,9 +106,9 @@ const RegisterPage = () => {
         
         {/* Left Panel (Desktop only) */}
         <div className="register-left-panel">
-          <div className="register-left-header">
-            <Building2 size={32} />
-            <div className="register-university-title">CT University</div>
+          <div className="register-left-header" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <PortalBrandLogo />
+            <div className="register-university-title">{systemName}</div>
           </div>
           <div className="register-left-body">
             <h2>Secure Portal Registration</h2>
@@ -124,8 +127,11 @@ const RegisterPage = () => {
           
           {/* Mobile Header (Hidden on Desktop) */}
           <div className="register-mobile-header">
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '0.75rem' }}>
+              <PortalBrandLogo />
+            </div>
             <h1>Create an Account</h1>
-            <p>Register to access CT University's centralized task management system.</p>
+            <p>Register to access {systemName}'s centralized task management system.</p>
           </div>
           
           {/* Mobile Info Box (Hidden on Desktop) */}

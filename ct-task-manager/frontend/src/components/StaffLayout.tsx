@@ -4,16 +4,18 @@ import {
   LayoutDashboard, 
   CheckSquare, 
   Search, 
-  Shield,
   Menu
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import './StaffLayout.css';
 import UserProfileDropdown from './UserProfileDropdown';
 import NotificationDropdown from './NotificationDropdown';
+import { useSettings } from '../context/SettingsContext';
+import PortalBrandLogo from './PortalBrandLogo';
 
 const StaffLayout: React.FC = () => {
   const { currentUser: user } = useAuth();
+  const { systemName } = useSettings();
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
   const navLinks = [
@@ -32,13 +34,11 @@ const StaffLayout: React.FC = () => {
 
       {/* Desktop & Mobile Sidebar */}
       <aside className={`staff-sidebar ${isMobileSidebarOpen ? 'mobile-open' : ''}`}>
-        <div className="staff-sidebar-brand">
-          <div className="staff-brand-icon">
-            <Shield size={20} />
-          </div>
+        <div className="staff-sidebar-brand" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <PortalBrandLogo />
           <div>
-            <div>CT University</div>
-            <div className="staff-brand-sub">TMS PORTAL</div>
+            <div>{systemName}</div>
+            <div className="staff-brand-sub">PORTAL</div>
           </div>
         </div>
 

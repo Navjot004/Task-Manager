@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, LogOut, ChevronDown, Building, Shield } from 'lucide-react';
+import { User, LogOut, ChevronDown, Building, Shield, Settings } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useSettings } from '../context/SettingsContext';
 import './UserProfileDropdown.css';
 
 interface UserProfileDropdownProps {
@@ -23,6 +24,7 @@ export const UserProfileDropdown: React.FC<UserProfileDropdownProps> = ({
   const dropdownRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const { logout } = useAuth();
+  const { openSettingsModal } = useSettings();
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -41,6 +43,11 @@ export const UserProfileDropdown: React.FC<UserProfileDropdownProps> = ({
   const handleNavigateProfile = () => {
     setIsOpen(false);
     navigate(profilePath);
+  };
+
+  const handleOpenSettings = () => {
+    setIsOpen(false);
+    openSettingsModal();
   };
 
   const handleLogout = () => {
@@ -114,6 +121,16 @@ export const UserProfileDropdown: React.FC<UserProfileDropdownProps> = ({
                 </span>
               </div>
             </button>
+
+            {user?.role === 'super_admin' && (
+              <button className="upd-menu-item" onClick={handleOpenSettings}>
+                <Settings size={16} />
+                <div className="upd-menu-text">
+                  <span className="upd-menu-title">Settings</span>
+                  <span className="upd-menu-sub">System name & branding</span>
+                </div>
+              </button>
+            )}
           </div>
 
           <div className="upd-popover-divider" />

@@ -8,6 +8,7 @@ import taskRoutes from './task';
 import departmentRoutes from './department';
 import fileRoutes from './file';
 import notificationRoutes from './notification';
+import settingRoutes from './setting';
 
 const router = Router();
 
@@ -21,5 +22,6 @@ router.use('/tasks', taskRoutes);
 router.use('/departments', departmentRoutes);
 router.use('/files', fileRoutes);
 router.use('/notifications', notificationRoutes);
+router.use('/settings', settingRoutes);
 
 export default router;

@@ -196,14 +196,28 @@ export const getTasks = async (req: Request, res: Response) => {
         { delegatedTo: { $in: myStaffIds } }
       ];
     } else if (user.role === 'super_admin') {
-      // Super admin sees tasks they created, tasks assigned/delegated to them, or tasks submitted to them for review
-      query.$or = [
-        { createdBy: user._id },
-        { assignedTo: user._id },
-        { delegatedTo: user._id },
-        { reviewStage: 'super_admin' },
-        { currentReviewer: user._id }
-      ];
+      const myStaffAssignments = await StaffAssignment.find({ adminId: user._id, isActive: true });
+      const myStaffIds = myStaffAssignments.map(a => a.staffId);
+      const teamOnly = req.query.teamOnly === 'true';
+
+      if (teamOnly) {
+        query.$or = [
+          { assignedTo: { $in: myStaffIds } },
+          { delegatedTo: { $in: myStaffIds } },
+          { createdBy: user._id, assignedTo: { $in: myStaffIds } }
+        ];
+      } else {
+        // Super admin sees tasks they created, tasks assigned/delegated to them or their team staff, or submitted for review
+        query.$or = [
+          { createdBy: user._id },
+          { assignedTo: user._id },
+          { delegatedTo: user._id },
+          { assignedTo: { $in: myStaffIds } },
+          { delegatedTo: { $in: myStaffIds } },
+          { reviewStage: 'super_admin' },
+          { currentReviewer: user._id }
+        ];
+      }
     }
 
     // Filters

@@ -28,6 +28,7 @@ const TasksPage: React.FC = () => {
   const [priorityFilter, setPriorityFilter] = useState('All'); // Color/Priority filter
   const [schoolFilter, setSchoolFilter] = useState('All');     // Department/School filter
   const [taskTypeFilter, setTaskTypeFilter] = useState('All');
+  const [teamOnlyFilter, setTeamOnlyFilter] = useState(false); // Super Admin Team Tasks toggle
   
   // Departments list for school filter
   const [departments, setDepartments] = useState<any[]>([]);
@@ -51,7 +52,8 @@ const TasksPage: React.FC = () => {
         search,
         status: statusFilter !== 'All' ? statusFilter : undefined,
         taskType: taskTypeFilter !== 'All' ? taskTypeFilter : undefined,
-        department: schoolFilter !== 'All' ? schoolFilter : undefined,
+        department: (!teamOnlyFilter && schoolFilter !== 'All') ? schoolFilter : undefined,
+        teamOnly: teamOnlyFilter ? 'true' : undefined,
       });
       setTasks(res.data.tasks);
       setTotalPages(res.data.pagination.totalPages);
@@ -82,8 +84,30 @@ const TasksPage: React.FC = () => {
     
     try {
       if (user?.role === 'super_admin') {
-        const res = await api.getUsers({ limit: 1000, status: 'Active' });
-        setAvailableAssignees(res.data.users.filter((u: any) => u._id !== user.id && u.id !== user.id));
+        const [usersRes, teamRes] = await Promise.all([
+          api.getUsers({ limit: 1000, status: 'Active' }),
+          api.getAdminAssignments(user.id).catch(() => ({ data: { assignments: [] } }))
+        ]);
+
+        const myTeamStaffIds = new Set(
+          (teamRes.data?.assignments || []).map((a: any) => a.staffId?._id || a.staffId?.id)
+        );
+
+        const allUsers = usersRes.data.users.filter((u: any) => u._id !== user.id && u.id !== user.id);
+
+        const prioritized = allUsers.map((u: any) => {
+          const isTeam = myTeamStaffIds.has(u._id || u.id);
+          return {
+            ...u,
+            isSuperAdminTeamMember: isTeam
+          };
+        }).sort((a: any, b: any) => {
+          if (a.isSuperAdminTeamMember && !b.isSuperAdminTeamMember) return -1;
+          if (!a.isSuperAdminTeamMember && b.isSuperAdminTeamMember) return 1;
+          return 0;
+        });
+
+        setAvailableAssignees(prioritized);
       } else if (user?.role === 'department_admin') {
         const res = await api.getAdminAssignments(user.id);
         const myStaff = res.data.assignments.map(a => a.staffId);
@@ -118,7 +142,7 @@ const TasksPage: React.FC = () => {
     if (user && !isCreatingTask) {
       loadTasks();
     }
-  }, [page, statusFilter, schoolFilter, taskTypeFilter, user, search, isCreatingTask]);
+  }, [page, statusFilter, schoolFilter, taskTypeFilter, teamOnlyFilter, user, search, isCreatingTask]);
 
   // Handle openTask / openChat from notification popup click
   useEffect(() => {
@@ -294,6 +318,18 @@ const TasksPage: React.FC = () => {
               onChange={(e) => { setSearch(e.target.value); setPage(1); }}
             />
           </div>
+
+          {/* Scope Selector: All Tasks vs My Team Tasks (Super Admin) */}
+          {user?.role === 'super_admin' && (
+            <select 
+              className="tasks-filter-select" 
+              value={teamOnlyFilter ? 'team' : 'all'} 
+              onChange={e => { setTeamOnlyFilter(e.target.value === 'team'); setPage(1); }}
+            >
+              <option value="all">All Tasks</option>
+              <option value="team">My Team</option>
+            </select>
+          )}
           
           {/* 1. Color / Priority Filter */}
           <select 
@@ -312,11 +348,14 @@ const TasksPage: React.FC = () => {
           {user?.role === 'super_admin' && (
             <select 
               className="tasks-filter-select" 
-              value={schoolFilter} 
+              value={teamOnlyFilter ? 'All' : schoolFilter} 
               onChange={e => { setSchoolFilter(e.target.value); setPage(1); }}
+              disabled={teamOnlyFilter}
+              style={teamOnlyFilter ? { opacity: 0.55, cursor: 'not-allowed', backgroundColor: '#f1f5f9' } : {}}
+              title={teamOnlyFilter ? 'Department filter is disabled for My Team' : undefined}
             >
-              <option value="All">School: All</option>
-              {departments.map(dept => (
+              <option value="All">{teamOnlyFilter ? 'Department: N/A (My Team)' : 'School: All'}</option>
+              {!teamOnlyFilter && departments.map(dept => (
                 <option key={dept._id} value={dept.name}>{dept.name}</option>
               ))}
             </select>

@@ -1,13 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { NavLink, Outlet } from 'react-router-dom';
 import { 
   LayoutDashboard, 
   CheckSquare, 
   Users, 
   Search, 
-  LogOut, 
   Menu, 
-  ShieldHalf,
   ShieldCheck
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -15,10 +13,12 @@ import { api } from '../services/api';
 import './DeptAdminLayout.css';
 import UserProfileDropdown from './UserProfileDropdown';
 import NotificationDropdown from './NotificationDropdown';
+import { useSettings } from '../context/SettingsContext';
+import PortalBrandLogo from './PortalBrandLogo';
 
 const DeptAdminLayout: React.FC = () => {
-  const { currentUser: user, logout } = useAuth();
-  const navigate = useNavigate();
+  const { currentUser: user } = useAuth();
+  const { systemName } = useSettings();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [canAccessVerified, setCanAccessVerified] = useState(false);
 
@@ -29,39 +29,34 @@ const DeptAdminLayout: React.FC = () => {
           setCanAccessVerified(true);
         }
       })
-      .catch(err => console.error('Failed to fetch dept permissions', err));
-  }, [user]);
-
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
-  };
+      .catch(err => {
+        console.error('Failed to check verified user access', err);
+      });
+  }, []);
 
   const navLinks = [
     { to: "/admin", icon: <LayoutDashboard size={20} />, label: "Dashboard", end: true },
-    { to: "/admin/tasks", icon: <CheckSquare size={20} />, label: "Team Tasks" },
-    { to: "/admin/staff", icon: <Users size={20} />, label: "Manage Team" },
+    { to: "/admin/tasks", icon: <CheckSquare size={20} />, label: "Tasks" },
+    { to: "/admin/staff", icon: <Users size={20} />, label: "My Team" },
     ...(canAccessVerified ? [{ to: "/admin/verified-users", icon: <ShieldCheck size={20} />, label: "Verified Users" }] : []),
   ];
 
   return (
     <div className="dept-admin-layout">
-      {/* Mobile Sidebar Overlay */}
+      {/* Mobile Backdrop */}
       {sidebarOpen && (
         <div 
-          className="dept-sidebar-overlay"
-          onClick={() => setSidebarOpen(false)}
+          className="dept-sidebar-overlay" 
+          onClick={() => setSidebarOpen(false)} 
         />
       )}
 
       {/* Sidebar */}
       <aside className={`dept-sidebar ${sidebarOpen ? 'open' : ''}`}>
         <div className="dept-sidebar-header">
-          <div className="dept-sidebar-brand">
-            <div className="dept-brand-icon">
-              <ShieldHalf size={20} />
-            </div>
-            CT UNI DEPT
+          <div className="dept-sidebar-brand" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <PortalBrandLogo />
+            <span>{systemName}</span>
           </div>
         </div>
 
@@ -82,17 +77,6 @@ const DeptAdminLayout: React.FC = () => {
               </NavLink>
             ))}
           </nav>
-        </div>
-
-        <div className="dept-sidebar-footer">
-          <button 
-            className="dept-nav-item logout" 
-            style={{ width: '100%', border: 'none', background: 'transparent', cursor: 'pointer' }}
-            onClick={handleLogout}
-          >
-            <LogOut size={20} />
-            Logout
-          </button>
         </div>
       </aside>
 
