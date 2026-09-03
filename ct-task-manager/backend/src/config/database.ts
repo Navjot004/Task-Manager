@@ -1,7 +1,15 @@
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
+import dns from 'dns';
 
 dotenv.config();
+
+// Fix for Node.js SRV lookup issues on Windows / local router DNS (querySrv ECONNREFUSED)
+try {
+  dns.setServers(['8.8.8.8', '8.8.4.4']);
+} catch {
+  // Ignore if custom DNS cannot be set
+}
 
 const MONGODB_URI = process.env.MONGODB_URI || '';
 const DATABASE_NAME = process.env.DATABASE_NAME || 'ct_task_manager';
